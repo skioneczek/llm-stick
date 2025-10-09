@@ -11,14 +11,19 @@
 - If adapters are active and security slider is Paranoid, display refusal notice; no audio.
 
 ## Home Screen (Voice Mode OFF)
-- Screen: Large-text command menu (Stop, Repeat, Summarize, Sources, Panic). Voice Mode toggle OFF.
+- Screen: Large-text command menu (Stop, Repeat, Summarize, Sources, Panic); prominent text ask box with 36pt label "Type your question" and placeholder "Press Enter to submit"; Voice Mode toggle OFF with helper text "Voice Mode is off — use the text box or commands.".
 - Audio: Silent.
-- User may enable Voice Mode via toggle (persisted setting).
+- User may enable Voice Mode via toggle (persisted setting) or submit text questions.
+
+## Text Ask Box (Always Available)
+- Location: Center column below command menu; 36pt label, 48pt input text, 60px high submit button labelled "Ask"; supports keyboard Enter and Shift+Enter for new line.
+- Accessibility: ARIA label "Type your question"; focus ring 4px high contrast; screen reader hint "Voice Mode off by default. Type and press Enter to ask.".
+- Feedback: After submit, field clears; last response summary appears below with "Repeat" command highlighted.
 
 ## Enabling Voice Mode
 - Action: User toggles Voice Mode ON.
 - Audio: "Voice Mode enabled. Hold space to speak." (one short confirmation line).
-- Screen: Toggle shows ON; Hold-to-Talk button appears with focus ring; commands remain visible.
+- Screen: Toggle text changes to "Voice Mode ON — hold space to talk"; Hold-to-Talk button appears with focus ring; commands and text ask box remain visible.
 - Keys: Spacebar acts as push-to-talk while held.
 
 ## Listening State (Voice Mode ON)
@@ -46,7 +51,7 @@
 ## Disabling Voice Mode
 - Action: User toggles Voice Mode OFF.
 - Audio: "Voice Mode disabled. Use buttons or keyboard." (short confirmation).
-- Screen: Hold-to-Talk control hides; toggle shows OFF.
+- Screen: Hold-to-Talk control hides; toggle shows OFF with helper text "Voice Mode is off — type to ask"; text ask box regains focus.
 
 ## Earcon Specifications
 - Listening: `earcon_listening.wav` – 400 Hz sine chirp rising 200 ms, played once; <60 dB.

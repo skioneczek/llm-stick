@@ -126,6 +126,21 @@ Common build interface lives under `packaging/`:
 
 All scripts rely on vendored dependencies and operate without network access.
 
+### Dropping Native Binaries
+- Place CPU-only `llama.cpp` builds under `App/bin/llama/` with filenames by architecture:
+  - `App/bin/llama/llama-windows-x64.exe`
+  - `App/bin/llama/llama-macos-arm64`
+  - `App/bin/llama/llama-linux-x64`
+- Place `whisper.cpp` binaries under `App/bin/whisper/` following the same pattern.
+- Store GGUF / Whisper models in `App/models/{llm,stt}/`.
+- Zero configuration assumed: launchers invoke wrappers that point to these paths; no downloads occur.
+
+### TTS Hook (Offline)
+- Default voice: OS-provided speech synthesizer (SAPI on Windows, `say` on macOS) invoked only when Voice Mode is enabled.
+- Linux fallback: bundle `espeak` or `espeak-ng` binary in `App/bin/tts/` and call it with `--stdout` → pipe to audio device.
+- Toggle stored in `Data/config/voice_mode.json.enc`; announcement only emits when user opts in.
+- No speech assets are fetched remotely; logs remain inside `Data/logs/`.
+
 ## Future Hooks
 - Replace CLI PIN prompt with tactile UI once `apps/ui` implements accessibility surfaces.
 - Integrate real voice synthesis pipeline in `voice.py` when Speech Mode ships.

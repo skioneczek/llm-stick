@@ -5,9 +5,10 @@
 | Launch (Voice Mode OFF) | Silent | High-contrast 6-digit PIN pad; large buttons; focus ring on first digit | Tab cycles digits; digits/Enter submit; Escape brings up Panic |
 | Invalid PIN | Silent | PIN pad with 36pt error banner "PIN not recognized"; focus returns to first digit | Digits/Enter retry; Escape Panic |
 | Security Self-Check | Silent | 36pt text "Running offline self-check…" then two-line audit result | Tab to Cancel (mapped to Panic); Enter confirms proceed |
-| Home (Voice Mode OFF) | Silent | Large command menu (Stop, Repeat, Summarize, Sources, Panic); Voice toggle OFF | Arrow/Tab navigate menu; Enter activates; Alt+V toggles Voice |
+| Home (Voice Mode OFF) | Silent | Large command menu (Stop, Repeat, Summarize, Sources, Panic); 36pt text ask box labelled "Type your question"; Voice toggle OFF with helper text "Voice Mode is off — type to ask" | Arrow/Tab navigate menu; Enter activates; Alt+V toggles Voice; Enter submits ask |
+| Text Ask Submitted | Silent | Ask box clears; latest response card appears with Repeat button focused; Voice toggle remains OFF unless user changed it | Enter submits; Shift+Enter adds newline; R repeats |
 | Voice Mode Enabled | "Voice Mode enabled. Hold space to speak." | Toggle shows ON; Hold-to-Talk button with focus ring; menu remains | Spacebar = push-to-talk; Enter activates focused control |
-| Voice Mode Disabled | "Voice Mode disabled. Use buttons or keyboard." | Toggle shows OFF; Hold-to-Talk hidden; menu visible | Same as Home OFF state |
+| Voice Mode Disabled | "Voice Mode disabled. Use buttons or keyboard." | Toggle shows OFF with helper text "Voice Mode is off — type to ask"; Hold-to-Talk hidden; text ask box regains focus | Same as Home OFF state |
 | Listening | `earcon_listening.wav` once | High-contrast waveform; 36pt caption "Listening… hold space"; Stop/Repeat/Summarize/Sources/Panic visible | Spacebar must stay held; releasing moves to Thinking; Esc Panic |
 | Timeout Prompt (Listening) | Silent unless Voice Mode ON and follow-up requested | Caption "Still there?" with focus returning to Hold-to-Talk | Spacebar restarts capture; commands hotkeys active |
 | Thinking | Looping `earcon_thinking.wav` | 36pt text "Thinking offline…"; animated focus outline; commands visible | Spacebar ignored until response ready; Stop cancels |

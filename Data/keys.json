@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "pin": {
+    "salt": "JDhk1KWhkrexIo0FXUTwVQ==",
+    "hash": "I4IBPLX0Rva9K2Dei+/15M0mShZv/FicyAL0F8gOEMo="
+  },
+  "recovery": {
+    "salt": "Xc9zeSQQADUmb73RAsqXbg==",
+    "hash": "mMrhSgk5kjqUMCey0ffFCtHbvL4xBaHVe6B4ZsCFDKk="
+  },
+  "created_at": 1760025304
+}

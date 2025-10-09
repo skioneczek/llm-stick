@@ -41,17 +41,23 @@ def top_hits(index: Dict, query: str, k: int = 8) -> List[Dict]:
     return [dict(score=round(s, 4), **c) for s, c in scored[:k]]
 
 def extractive_answer(query: str, hits: List[Dict], root: Path) -> Tuple[str, List[Dict]]:
-    # Minimal extractive answer: show 2–3 concise bullets grounded in top chunks
-    bullets = []
-    cites = []
-    for h in hits[:3]:
-        # Build a short bullet from preview; in real build we’d call the LLM
-        preview = " ".join(h["preview"].split()[:40])
+    bullets: List[str] = []
+    cites: List[Dict] = []
+    for h in hits[:4]:
+        preview = " ".join(h.get("preview", "").split()[:40]).strip()
+        if not preview:
+            continue
         bullets.append(f"- {preview} …")
-        # citation
         mtime = datetime.datetime.fromtimestamp(h["mtime"]).strftime("%Y-%m-%d")
         cites.append({"file": h["file"], "date": mtime})
-    answer = "Here’s what I found:\n" + "\n".join(bullets)
+
+    if not bullets:
+        answer = "No matching chunks found offline. Consider adding source documents or refining the question."
+        return answer, []
+
+    answer_lines = ["Here’s what I found:"] + bullets
+    answer_lines.append('Ask "Sources?" for file names and dates.')
+    answer = "\n".join(answer_lines)
     return answer, cites
 
 def run(query: str, index_path: Path | str = Path("Data/index.json")):
@@ -63,9 +69,10 @@ def run(query: str, index_path: Path | str = Path("Data/index.json")):
     hits = top_hits(index, query, k=8)
     ans, cites = extractive_answer(query, hits, Path(index["root"]))
     print(ans)
-    print("\nSources:")
-    for c in cites:
-        print(f"- {c['file']} (modified {c['date']})")
+    if cites:
+        print("\nSources:")
+        for c in cites:
+            print(f"- {c['file']} (modified {c['date']})")
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()

@@ -18,6 +18,13 @@
 - Voice panic command reliably wipes temps and exits irrespective of slider mode.
 - Post-change audit renders 1–2 line status per mode with failure reasons when applicable.
 
+## PIN Lifecycle
+- **Storage layout:** `Data/security/pin.txt` holds the 6-digit PIN; `Data/security/recovery_phrase.txt` stores the 12-word phrase (comment header + single line payload) until crypto wraps arrive.
+- **Unlock:** `unlock_with_pin()` enforces digit-length validation, 5-attempt lock (15 minutes), and 10-attempt replug requirement before clearing counters.
+- **Change:** `change_pin(current, new, confirm)` requires current PIN success, matching confirmation, and writes the new PIN to `pin.txt` while resetting attempts.
+- **Reset:** `reset_with_phrase(words, new, confirm, replacement)` matches the stored phrase, sets a fresh PIN, optionally rotates the phrase, and clears lockout state.
+- **Recovery maintenance:** `set_recovery_phrase()` bootstraps or replaces the phrase; operators must ensure words are lowercase ASCII and policy-compliant before import.
+
 ## Mode Enforcement Reference
 - **Standard**: Adapters may remain active; must prove outbound sockets blocked internally and log result using `STANDARD_AUDIT` when proceeding.
 - **Hardened**: Same as Standard plus DNS resolver disabled and privileges reduced; emit `HARDENED_AUDIT` confirming clamps with adapters noted.
