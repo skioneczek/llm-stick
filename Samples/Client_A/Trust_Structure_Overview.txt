@@ -1,0 +1,31 @@
+Purpose and Overview
+This illustrative family trust is designed to steward multi‑asset wealth for two generations while preserving flexibility for changing circumstances. It is a neutral sample set for testing an offline AI workflow, not advice. The trust aims to fund educational support, health contingencies, and measured entrepreneurship while keeping administrative friction and risk exposure low.
+
+Parties and Roles
+The grantors are a hypothetical couple who seed the trust with a modest portfolio and reserve no retained powers beyond what a standard independent trustee can administer. The primary trustee is an independent fiduciary charged with prudent investment selection, conflict‑free decision‑making, and annual reporting. A backup trustee is named to reduce downtime. A trust protector, acting only on narrow triggers (trustee incapacity, legal changes, or explicit compliance defects), may replace the trustee or approve amendments within the trust’s four corners.
+
+Funding and Assets
+Seed assets comprise a diversified brokerage account, a cash reserve, and units in a pass‑through entity that holds operating interests. The policy goal is to maintain liquidity for distributions while aligning long‑term holdings with a low‑volatility allocation. Concentrated positions—if any—are addressed with a scheduled diversification plan and a tolerance band that the trustee must monitor. Illiquid assets may be maintained if reasonable rental or dividend yields are expected, and if custody, tax, and recordkeeping burdens remain proportionate.
+
+Distributions and Standards
+Distributions follow a familiar framework: health, education, maintenance, and support. The trustee may elevate educational opportunities (tuition, certifications, reasonable living stipends) subject to annual caps and proof of progress. Entrepreneurship grants are allowed when a credible plan and third‑party budget are presented; these are staged, with small initial tranches and milestone‑based follow‑ons. Emergency medical needs may override normal caps. The trustee keeps a short memo after every discretionary request documenting the facts, rationale, and outcome.
+
+Investment Policy Highlights
+The default glidepath favors low‑cost, broadly diversified funds balanced against a conservative fixed‑income ladder that reduces sequence‑of‑returns risk. Risk controls include a maximum equity allocation, rebalancing bands, and a standing instruction to harvest tax losses when efficient. Any alternative investments must be accompanied by a simple written thesis, return target, and exit conditions. Cash reserves target six to nine months of typical distributions and known tax obligations.
+
+Governance and Reporting
+The trustee issues an annual summary: opening values, additions, distributions, fees, closing values, and a simple forward‑looking note. Beneficiaries receive a plain‑language recap alongside the formal report. The protector reviews only on exception and does not micromanage allocation or monthly activity. If beneficiaries disagree with a decision, a short written appeal triggers a 30‑day reconsideration, after which the decision is final unless new facts emerge.
+
+Tax and Compliance
+This sample omits jurisdiction‑specific treatment and should be evaluated under professional guidance in real deployments. The focus for testing is structural: clear roles, auditable decisions, and predictable distributions. The trustee maintains a calendar of recurring filings and deadlines. If the trust holds interests in an entity, the trustee obtains annual K‑1s and keeps an archive, tracking basis adjustments and material participation where relevant.
+
+Continuity and Amendments
+If laws materially change or original assumptions fail, the protector may approve narrow updates that preserve the intent: long‑term support, prudent risk, simplicity, and transparency. If no protector is available, a court of competent jurisdiction can confirm an independent successor and ratify minor administrative amendments.
+
+Open Questions (for testing the retrieval workflow)
+1) What is the target equity allocation and how should it adjust as beneficiaries age?
+2) Which distributions require staged milestones and what evidence is sufficient to unlock the next tranche?
+3) How should concentrated stock positions be diversified without creating undue tax drag?
+4) What threshold of expenses or volatility should trigger a review of illiquid holdings?
+5) Which documents must be delivered annually to beneficiaries, and in what format?
+6) Under what circumstances may the protector replace the trustee, and what notice is required?

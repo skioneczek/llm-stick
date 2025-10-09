@@ -1,0 +1,22 @@
+# Risk Register
+
+- **Air-gap bypass via misconfigured adapters**
+  - Severity: High
+  - Owner: Security Lead
+  - Mitigation: Enforce adapter check in Paranoid; run self-check after slider changes.
+  - Status: Open
+- **Voice Mode autostart regression**
+  - Severity: Medium
+  - Owner: Accessibility Lead
+  - Mitigation: Default Voice Mode OFF; require manual toggle with audit log.
+  - Status: Monitoring
+- **Host write permissions leaking**
+  - Severity: Medium
+  - Owner: Systems Lead
+  - Mitigation: Restrict host access via `bind_host_path()` read-only alias; audit on enforcement.
+  - Status: Open
+- **R-001 Network guard false-positive on some OS builds**
+  - Severity: Medium
+  - Owner: Security Lead
+  - Mitigation: internal guard fallback + revert on failure
+  - Status: Open (Day 1 note: Standard/Hardened probes recorded in `tests/e2e/smoke.md` to monitor guard accuracy.)

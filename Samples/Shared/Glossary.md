@@ -1,0 +1,20 @@
+- **CRUT** — Charitable Remainder Unitrust that pays a percentage to noncharitable beneficiaries with the remainder to charity.
+- **GRAT** — Grantor Retained Annuity Trust that returns an annuity to the grantor for a term, remainder to beneficiaries.
+- **FMV** — Fair Market Value, the price a willing buyer and seller would agree to under no compulsion.
+- **Basis** — Tax basis, generally cost adjusted for improvements, depreciation, and prior adjustments.
+- **Step-up** — Adjustment of basis to fair market value at death under applicable law.
+- **QCD** — Qualified Charitable Distribution from certain retirement accounts directly to charity.
+- **Pass-through** — Entity whose income flows to owners (e.g., S corp, partnership, LLC taxed as partnership).
+- **K‑1** — Schedule reporting a partner’s or shareholder’s share of income, deductions, and credits.
+- **IPS** — Investment Policy Statement guiding allocation and risk controls.
+- **HEMS** — Health, Education, Maintenance, and Support distribution standard.
+- **Trust Protector** — A party empowered to replace trustees or approve limited amendments.
+- **Trustee** — Fiduciary who administers assets per the trust terms and law.
+- **Rebalancing Band** — Tolerance range that triggers realignment of asset weights.
+- **Liquidity Reserve** — Cash set aside to meet near-term distributions and taxes.
+- **Diversification Plan** — Schedule to trim concentrated positions within tax and risk constraints.
+- **Glidepath** — Planned change in asset allocation over time.
+- **DAF** — Donor-Advised Fund allowing advisory input on grants without direct control.
+- **Entity Chart** — Diagram of ownership relationships across holding and operating companies.
+- **RAG** — Retrieval-Augmented Generation: combine documents with a language model for answers.
+- **Memory Ledger** — Short, structured summaries the system retains to recall conclusions later.
