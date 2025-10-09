@@ -1,0 +1,164 @@
+body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    background-color: #111;
+    color: #f8f9fa;
+    margin: 0;
+    padding: 0 1.5rem 2rem;
+}
+
+header,
+section {
+    margin: 1.5rem auto;
+    max-width: 960px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 1rem 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+header h1 {
+    margin: 0 0 0.5rem;
+    font-size: 2rem;
+}
+
+.status {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+button {
+    background: #ffc107;
+    border: none;
+    border-radius: 4px;
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+input,
+textarea,
+select {
+    width: 100%;
+    padding: 0.5rem;
+    margin-top: 0.25rem;
+    margin-bottom: 0.75rem;
+    border-radius: 4px;
+    border: 1px solid #555;
+    background: #1d1f21;
+    color: #f8f9fa;
+}
+
+.thread-item {
+    list-style: none;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.35);
+}
+
+.thread-item header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.thread-item .meta {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.9rem;
+    color: #ced4da;
+}
+
+.thread-item .actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.badge {
+    background: #17a2b8;
+    color: #111;
+    padding: 0.1rem 0.6rem;
+    border-radius: 2rem;
+    font-size: 0.8rem;
+}
+
+.messages {
+    margin: 1rem 0;
+}
+
+.messages ol {
+    list-style: decimal;
+    padding-left: 1.25rem;
+}
+
+.message {
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    border-radius: 6px;
+    background: rgba(10, 10, 10, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.message.user {
+    border-color: #ffc107;
+}
+
+.message.assistant {
+    border-color: #0dcaf0;
+}
+
+.message header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    color: #adb5bd;
+}
+
+.message pre {
+    white-space: pre-wrap;
+    margin: 0.5rem 0 0;
+}
+
+.citations {
+    margin: 0.5rem 0 0;
+    padding-left: 1.25rem;
+    color: #6c757d;
+}
+
+.empty {
+    color: #6c757d;
+    font-style: italic;
+}
+
+#audit-log {
+    background: #000;
+    min-height: 160px;
+    padding: 1rem;
+    border-radius: 6px;
+    overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+    body {
+        padding: 0 0.5rem 1.5rem;
+    }
+
+    header,
+    section {
+        padding: 1rem;
+    }
+
+    .status {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}

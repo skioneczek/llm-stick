@@ -1,7 +1,7 @@
 # services/security/net_guard.py
 # Process-local outbound guard: monkeypatch sockets & DNS. No admin rights required.
 from __future__ import annotations
-import socket, builtins, os, tempfile, shutil
+import socket, builtins, os, tempfile, shutil, ipaddress
 from typing import Any, Tuple
 
 # Keep originals so we can restore if needed
@@ -17,6 +17,20 @@ class _BlockAllSockets(socket.socket):
     def connect_ex(self, address: Tuple[str, int]) -> int:  # type: ignore[override]
         raise OSError("Outbound networking blocked by LLM Stick guard.")
 
+
+class _LoopbackOnlySocket(socket.socket):
+    def connect(self, address: Tuple[str, int]) -> None:  # type: ignore[override]
+        host = address[0]
+        if not _is_loopback_host(host):
+            raise OSError("Outbound networking blocked — loopback only policy.")
+        return super().connect(address)
+
+    def connect_ex(self, address: Tuple[str, int]) -> int:  # type: ignore[override]
+        host = address[0]
+        if not _is_loopback_host(host):
+            raise OSError("Outbound networking blocked — loopback only policy.")
+        return super().connect_ex(address)
+
 def _block_dns(*args: Any, **kwargs: Any):
     raise OSError("DNS resolution blocked by LLM Stick guard.")
 
@@ -26,10 +40,40 @@ def _patch_base(block_dns: bool):
     if block_dns:
         socket.getaddrinfo = _block_dns  # type: ignore[assignment]
 
+
+def _patch_loopback():
+    socket.socket = _LoopbackOnlySocket  # type: ignore[assignment]
+
+    def _create_connection(address, timeout=None, source_address=None):
+        host = address[0] if isinstance(address, tuple) else address
+        if not _is_loopback_host(host):
+            raise OSError("Outbound networking blocked — loopback only policy.")
+        return _ORIG["create_connection"](address, timeout, source_address)
+
+    def _getaddrinfo(host, port, *args, **kwargs):
+        if not _is_loopback_host(host):
+            raise OSError("DNS blocked — loopback only policy.")
+        return _ORIG["getaddrinfo"](host, port, *args, **kwargs)
+
+    socket.create_connection = _create_connection  # type: ignore[assignment]
+    socket.getaddrinfo = _getaddrinfo  # type: ignore[assignment]
+
 def _restore():
     socket.socket = _ORIG["socket"]            # type: ignore[assignment]
     socket.create_connection = _ORIG["create_connection"]  # type: ignore[assignment]
     socket.getaddrinfo = _ORIG["getaddrinfo"]  # type: ignore[assignment]
+
+
+def _is_loopback_host(host: str | None) -> bool:
+    if not host:
+        return False
+    lowered = host.lower()
+    if lowered in {"localhost", "127.0.0.1", "::1"}:
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
 
 def self_test(expect_blocked: bool=True) -> bool:
     # 1) DNS should fail if blocked, else may succeed (we only check "blocked" path here)
@@ -48,6 +92,27 @@ def self_test(expect_blocked: bool=True) -> bool:
     except Exception:
         sock_blocked = True
     return (dns_blocked and sock_blocked) if expect_blocked else (not dns_blocked and not sock_blocked)
+
+
+def _self_test_loopback() -> bool:
+    # External address must fail with our guard
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(0.5)
+        s.connect(("8.8.8.8", 53))
+        s.close()
+        return False
+    except OSError as exc:
+        if "loopback only" not in str(exc).lower():
+            return False
+    # loopback connect attempt should be permitted (may fail with ECONNREFUSED which is acceptable)
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(0.1)
+        s.connect(("127.0.0.1", 9))
+    except OSError:
+        pass
+    return True
 
 # Hardened/Paranoid temp sandbox (no host writes, but control temp locality)
 _tmp_root = None
@@ -78,8 +143,21 @@ def apply_hardened_guards(tmp_root: str) -> bool:
     enable_temp_sandbox(tmp_root)
     return self_test(expect_blocked=True)
 
+
+def allow_loopback_only() -> tuple[bool, str]:
+    """Allow local UI server while blocking non-loopback sockets."""
+    _patch_loopback()
+    ok = _self_test_loopback()
+    if not ok:
+        return False, "Loopback policy failed to apply."
+    return True, "Loopback allowed (UI server only)."
+
 def clear_guards():
     _restore()
+
+
+def audit_ui_server_disabled() -> str:
+    return "UI server disabled in Paranoid mode."
 
 def probe_text() -> tuple[str, str]:
     """Run DNS+socket checks in the *current process* and return short lines."""

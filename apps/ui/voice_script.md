@@ -12,17 +12,31 @@
 
 ## Home Screen (Voice Mode OFF)
 - Screen: Large-text command menu (Stop, Repeat, Summarize, Sources, Panic); prominent text ask box with 36pt label "Type your question" and placeholder "Press Enter to submit"; Voice Mode toggle OFF with helper text "Voice Mode is off — use the text box or commands.".
+- Controls row: Presets, Font Size ±, Serif/Sans, Bold, Contrast, Voice toggle, Set Data Folder, Security slider, Sources, Panic. Each control 48pt label with aria-describedby for shortcut hints.
 - Audio: Silent.
 - User may enable Voice Mode via toggle (persisted setting) or submit text questions.
+- Set Data Folder button appears alongside commands once unlocked.
 
 ## Voice Mode Availability Copy
 - Banner copy (if user opens toggle info): "Voice Mode processes speech locally. Turn it on only when you want to talk."
 - Screen reader note: aria-live "polite" message "Voice Mode is optional. All responses stay on this device." when toggle receives focus.
 
+## Set Data Folder Flow
+- Button label: "Set Data Folder" (48pt) with helper copy "Choose where the stick looks for files." (aria-describedby linked to note).
+- On activation: Open folder picker dialog showing 36pt header "Pick the folder containing the client files." If Voice Mode ON, speak "Pick the folder containing the client files." once; otherwise remain silent.
+- Reminder text in dialog: "Scanning stays local and may take a few minutes." (32pt; aria-describedby on Confirm).
+- Confirmation sheet: show chosen path in high-contrast text with buttons "Confirm" and "Cancel"; helper line "The app will scan this folder offline.".
+- Toast messaging: On Confirm, display "Data folder set to {path}. Scan may take time; all local." (aria-live polite). On Cancel, display "Data folder unchanged." for 3 seconds.
+
 ## Text Ask Box (Always Available)
 - Location: Center column below command menu; 36pt label, 48pt input text, 60px high submit button labelled "Ask"; supports keyboard Enter and Shift+Enter for new line.
 - Accessibility: ARIA label "Type your question"; focus ring 4px high contrast; screen reader hint "Voice Mode off by default. Type and press Enter to ask.".
 - Feedback: After submit, field clears; last response summary appears below with "Repeat" command highlighted.
+
+## Sources Control
+- Button label: "Sources" (48pt) with aria-label "Show file names and dates".
+- On activation: Show panel with 48pt heading "Sources" and collapsible entries; toast "Filenames and dates shown." appears at bottom (aria-live polite).
+- When panel closes, prompt text "Say or click Sources to open again." remains visible. No PII unless user requests.
 
 ## Enabling Voice Mode
 - Action: User toggles Voice Mode ON.
@@ -62,6 +76,16 @@
 - "Microphone not found. Use the text box or check your device." (hardware missing)
 - "Voice Mode paused while security check runs. Type your question instead." (guards reapplying)
 - All error lines surface as 36pt banners with aria-live "assertive" and no spoken output unless Voice Mode remains ON.
+
+## Panic Flow Copy
+- Panic button prompt: "Panic clears temporary data and exits." with note "Press Esc within 3 seconds to cancel." (both 36pt, aria-describedby link).
+- During execution: Banner "Panic in progress… clearing local data." (no auto speech unless Voice Mode ON). After completion, app shuts down.
+
+## Layout Wire (Text Description)
+- Title bar: Left shows app name + security mode; right shows clock and network status icons (no color reliance, high-contrast text).
+- Main content: Large answer area centered with 60pt body text adjusted by preset controls; scrollable with 4px focus outline.
+- Controls row (below answer): Presets | Font Size ± | Serif/Sans | Bold | Contrast | Voice toggle | Set Data Folder | Security slider | Sources | Panic. Buttons 48pt labels, spaced for large targets.
+- Footer: Audit strip showing latest enforcement message in 36pt text.
 
 ## Earcon Specifications
 - Listening: `earcon_listening.wav` – 400 Hz sine chirp rising 200 ms, played once; <60 dB.

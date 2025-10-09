@@ -24,12 +24,15 @@
 - **Change:** `change_pin(current, new, confirm)` requires current PIN success, matching confirmation, and writes the new PIN to `pin.txt` while resetting attempts.
 - **Reset:** `reset_with_phrase(words, new, confirm, replacement)` matches the stored phrase, sets a fresh PIN, optionally rotates the phrase, and clears lockout state.
 - **Recovery maintenance:** `set_recovery_phrase()` bootstraps or replaces the phrase; operators must ensure words are lowercase ASCII and policy-compliant before import.
+- **Source selection:** On "Set Data Folder" execute `validate_source(path)`; if it returns `Data source invalid: …` or `Data source requires confirm: …`, abort and keep the prior source until the user explicitly confirms. When validation succeeds, log `Data source validated: …`, then trigger index clear + rebuild under the guarded process before proceeding.
 
 ## Auxiliary Controls
 - **Clear logs — completed; local only.** Triggered when `clear_logs()` removes `Data/*.log`; memory ledger stays intact unless panic escalation explicitly requests ledger wipe (future Day-3 work).
 - **Temp sandbox — verified (paths under Data/tmp).** `verify_temp_sandbox()` ensures `TMPDIR`, `TMP`, and `TEMP` all resolve inside `Data/tmp` after Hardened guard activation.
 - **Temp sandbox — failed; reverting.** Emitted when any env var missing/unresolvable or pointing outside `Data/tmp`; Hardened must roll back to Standard until resolved.
 - **Panic semantics.** Voice panic wipes temps via `wipe_temps()` and exits but does **not** clear `Data/memory_ledger.json` by default; a “panic-and-forget” pathway will handle ledger purge in Day-3 scope.
+- **Loopback allowance.** Standard/Hardened launch must call `allow_loopback_only()` before starting the local UI server and log `Loopback allowed (UI server only).` Paranoid mode must skip UI server entirely and emit `UI server disabled in Paranoid mode.`
+- **HTTP hardening.** Any HTTP response the stick serves must pass through `apply_secure_headers()` to enforce the CSP (`default-src 'none'; ...`) and log `CSP applied (offline assets only).`
 
 ## Mode Enforcement Reference
 - **Standard**: Adapters may remain active; must prove outbound sockets blocked internally and log result using `STANDARD_AUDIT` when proceeding.

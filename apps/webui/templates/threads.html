@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>LLM Stick Threads</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    <script defer src="{{ url_for('static', filename='app.js') }}"></script>
+</head>
+<body data-view="{{ view }}">
+    <header>
+        <h1>LLM Stick Threads</h1>
+        <div class="status">
+            <span id="active-source">Loading source…</span>
+            <button id="refresh-threads">Refresh Threads</button>
+        </div>
+    </header>
+
+    <section id="thread-create">
+        <h2>New Thread</h2>
+        <form id="create-thread-form">
+            <label>Title
+                <input type="text" name="title" placeholder="Thread title" />
+            </label>
+            <label>Client Slug
+                <input type="text" name="client_slug" placeholder="default" />
+            </label>
+            <label>Source Path
+                <input type="text" name="source" placeholder="{{ threads[0].get('source_path') if threads else '' }}" />
+            </label>
+            <button type="submit">Create Thread</button>
+        </form>
+    </section>
+
+    <section id="thread-list">
+        <h2>Threads</h2>
+        {% if threads %}
+        <ul>
+            {% for thread in threads %}
+            <li data-thread-id="{{ thread['id'] }}" class="thread-item" aria-live="polite">
+                <header>
+                    <h3>{{ thread['title'] or 'Untitled' }}</h3>
+                    <div class="meta">
+                        <span>Client: {{ thread.get('client_slug') or 'default' }}</span>
+                        <span>Source: {{ thread.get('source_slug') or 'n/a' }}</span>
+                        {% if thread.get('archived') %}<span class="badge">Archived</span>{% endif %}
+                    </div>
+                    <div class="actions">
+                        <button class="load-thread" type="button">Open</button>
+                        <button class="archive-thread" type="button" data-archive="{{ 'false' if thread.get('archived') else 'true' }}">
+                            {{ 'Restore' if thread.get('archived') else 'Archive' }}
+                        </button>
+                    </div>
+                </header>
+                <article class="messages">
+                    {% if thread.get('messages') %}
+                    <ol>
+                        {% for message in thread['messages'] %}
+                        <li class="message {{ message['role'] }}">
+                            <header>
+                                <span class="role">{{ message['role'].title() }}</span>
+                                <time datetime="{{ message['ts'] }}">{{ message['ts'] }}</time>
+                            </header>
+                            <pre>{{ message.get('text') or '' }}</pre>
+                            {% if message.get('citations') %}
+                            <ul class="citations">
+                                {% for cite in message['citations'] %}
+                                <li>{{ cite.get('file') }} — {{ cite.get('date') }}</li>
+                                {% endfor %}
+                            </ul>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    </ol>
+                    {% else %}
+                    <p class="empty">No messages yet.</p>
+                    {% endif %}
+                </article>
+                <form class="message-form">
+                    <textarea name="prompt" rows="3" placeholder="Ask a question…" aria-label="Prompt"></textarea>
+                    <button type="submit">Send</button>
+                </form>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="empty">No threads yet. Create one above.</p>
+        {% endif %}
+    </section>
+
+    <section id="search">
+        <h2>Search Threads</h2>
+        <form id="search-form">
+            <input type="text" name="q" placeholder="Search" />
+            <button type="submit">Search</button>
+        </form>
+        <ul id="search-results"></ul>
+    </section>
+
+    <section id="controls">
+        <h2>Controls</h2>
+        <form id="set-source-form">
+            <label>Set Source Path
+                <input type="text" name="path" placeholder="/path/to/source" />
+            </label>
+            <label><input type="checkbox" name="force" /> Force (confirm warnings)</label>
+            <button type="submit">Set Source</button>
+        </form>
+
+        <form id="ingest-form">
+            <label>Ingest Path
+                <input type="text" name="path" placeholder="/path/to/data" />
+            </label>
+            <label>Client Slug
+                <input type="text" name="client_slug" placeholder="client-x" />
+            </label>
+            <label>Storage Mode
+                <select name="dest">
+                    <option value="HOST_LOCAL">HOST_LOCAL</option>
+                    <option value="STICK_ENCRYPTED">STICK_ENCRYPTED</option>
+                </select>
+            </label>
+            <button type="submit">Ingest</button>
+        </form>
+
+        <form id="hotswap-form">
+            <label>Hotswap Client Slug
+                <input type="text" name="client_slug" placeholder="client-x" />
+            </label>
+            <button type="submit">Hotswap</button>
+        </form>
+
+        <form id="preset-form">
+            <label>Reader Preset
+                <input type="text" name="preset" placeholder="48pt-serif" />
+            </label>
+            <button type="submit">Apply Preset</button>
+        </form>
+
+        {% if show_cli_button %}
+        <div class="cli-link">
+            <p>Need CLI? Use the launcher window to run guarded commands.</p>
+        </div>
+        {% endif %}
+    </section>
+
+    <section id="logs">
+        <h2>Audit Log</h2>
+        <pre id="audit-log" aria-live="polite"></pre>
+    </section>
+</body>
+</html>

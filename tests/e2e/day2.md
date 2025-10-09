@@ -14,6 +14,22 @@ print(second)
 PY
 ```
 
+## Scenario 8 — Loopback and HTTP Guard Audits
+```powershell
+python - <<'PY'
+from services.security import net_guard, http_guard
+
+ok, audit = net_guard.allow_loopback_only()
+print(ok, audit)
+net_guard.clear_guards()
+print(net_guard.audit_ui_server_disabled())
+
+headers, csp_audit = http_guard.apply_secure_headers({})
+print(headers["Content-Security-Policy"])
+print(csp_audit)
+PY
+```
+
 ### 1B Wrong Current PIN
 ```powershell
 python - <<'PY'
@@ -82,8 +98,42 @@ python -m apps.launcher.main --mode paranoid --pin 123456 --probe
 ## Scenario 5 — Voice Stub Loop
 ```powershell
 python - <<'PY'
-from services.preflight.audit import audit_voice
+```powershell
+python - <<'PY'
+import os
+from pathlib import Path
+from services.security import source_guard
+
 print(audit_voice(True).msg)
 print(audit_voice(False).msg)
+allowed_root = Path('Samples').resolve()
+os.environ['LLM_STICK_ALLOWED_SOURCE'] = str(allowed_root)
+
+ok, audit = source_guard.validate_source(str(Path('Samples/Client_A')))
+print(ok, audit)
+
+ok, audit = source_guard.validate_source(str(Path('C:/Windows')))
+print(ok, audit)  # expect False, outside allowed root
+
+# Trigger confirm-required by lowering thresholds
+os.environ['LLM_STICK_SOURCE_MAX_FILES'] = '0'
+ok, audit = source_guard.validate_source(str(Path('Samples/Client_A')))
+print(ok, audit)  # expect False with confirm message
+os.environ.pop('LLM_STICK_SOURCE_MAX_FILES')
+
+# Symlink escape check (skip gracefully if symlinks unavailable)
+link_root = allowed_root / 'link_escape'
+target_outside = Path('..').resolve()
+try:
+    if link_root.exists() or link_root.is_symlink():
+        link_root.unlink()
+    link_root.symlink_to(target_outside, target_is_directory=True)
+    ok, audit = source_guard.validate_source(str(link_root))
+    print(ok, audit)  # expect False with escape message
+except (OSError, NotImplementedError) as exc:
+    print('Symlink test skipped:', exc)
+finally:
+    if link_root.is_symlink():
+        link_root.unlink()
 PY
 ```

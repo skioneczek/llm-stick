@@ -13,8 +13,9 @@
   - Applies token-based windowing (adaptive 800–1200 tokens, 10–15% overlap) per document.
 - **`indexer embed --input {CHUNK_STREAM} --model bge-small-en`**
   - Uses local embedding model (switchable to `nomic-embed-text`).
-- **`indexer build-index --chunks {CHUNK_STREAM} --meta {META_STREAM}`**
-  - Produces FAISS index persisted to `services/indexer/store/` with integrity hash ledger.
+- **`python -m services.indexer.build_index --source {PATH}`**
+  - Rebuilds the managed index for the chosen read-only folder. When `--source` is omitted, the builder reuses the last folder stored in `Data/current_source.txt`.
+  - Indices are written to `Data/indexes/index_{slug}.json`, where `{slug}` is a SHA1 digest of the absolute source path.
 
 Each command runs a post-action enforcement self-check and prints a one-line audit: either `proceed:{timestamp}` or `revert:{error}`.
 
@@ -43,4 +44,10 @@ Each command runs a post-action enforcement self-check and prints a one-line aud
 ## Outputs
 - **Chunk artifacts**: Stored as `.jsonl` under `services/indexer/output/chunks/`.
 - **Embeddings**: `.npy` matrices aligned with chunk IDs.
-- **FAISS index**: `services/indexer/store/faiss_index.bin` with companion `meta.json` for schema.
+- **Managed indices**: JSON BM25 stores under `Data/indexes/`, keyed by source slug. The active source path lives in `Data/current_source.txt` and is consumed by the retriever.
+
+## Multi-Client Workflow
+1. Run `python -m services.indexer.build_index --source "C:\\OCRC_READONLY\\Client_A"` to set the active folder and rebuild the index.
+2. The retriever automatically resolves the correct `index_{slug}.json` based on `Data/current_source.txt`.
+3. Switch clients by rerunning the build command with a different `--source`; the previous index remains cached and can be reused by toggling the source file.
+4. Memory ledger entries are tagged with the active source, ensuring conclusions stay scoped to the selected client corpus.

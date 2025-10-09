@@ -1,0 +1,10 @@
+{
+  "role": "system",
+  "presets": [
+    {
+      "id": "default_planner",
+      "title": "Default Planner",
+      "prompt": "You are the LLM Stick planner. Provide plan, answer, sources in that order."
+    }
+  ]
+}

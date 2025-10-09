@@ -20,3 +20,23 @@
   - Owner: Security Lead
   - Mitigation: internal guard fallback + revert on failure
   - Status: Open (Day 1 note: Standard/Hardened probes recorded in `tests/e2e/smoke.md` to monitor guard accuracy.)
+- **R-002 Dynamic source selection leaks or slows indexing**
+  - Severity: Medium
+  - Owner: Security Lead
+  - Mitigation: Constrain `Set Source` to approved read-only roots, require explicit user confirmation, warn if folder exceeds thresholds (e.g., >1,000 files or >2 GB), allow cancel, validate via `services/security/source_guard.validate_source()` audit, and instruct Data to rebuild indexes only after a successful audit while retaining prior index on failure.
+  - Status: Open
+- **R-003 OCR / crypto provider unavailable at ingest time**
+  - Severity: Medium
+  - Owner: Platform Lead
+  - Mitigation: Detect missing OCR/crypto binaries up front, log via audit surface, fall back to signed stubs, and keep ingest pipeline pluggable so providers can be hot-swapped without blocking HOST_LOCAL ingest.
+  - Status: Open
+- **R-004 Ingestion bleed mixes client corpora**
+  - Severity: High
+  - Owner: Data Lead
+  - Mitigation: Require per-client registry with unique source slug, only allow ingest from registered sources, enforce ledger/index tagging, and abort if paths fall outside the active client scope.
+  - Status: Open
+- **R-005 Web UI loopback allowance expands socket surface**
+  - Severity: Medium
+  - Owner: Security Lead
+  - Mitigation: Allowlist 127.0.0.1 only, ship strict CSP with bundled assets, deny external fonts/CDNs, and disable the UI server entirely in Paranoid mode with fallback UI.
+  - Status: Open

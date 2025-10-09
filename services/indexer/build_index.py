@@ -2,7 +2,15 @@
 from __future__ import annotations
 import os, json, re, time, argparse
 from pathlib import Path
-from typing import Iterable, Dict, List, Tuple
+from typing import Iterable, Dict, List
+
+from services.indexer.source import (
+    get_current_source,
+    set_current_source,
+    index_path_for_source,
+    stats_for_source,
+)
+from services.security.source_guard import validate_source
 
 SUPPORTED = {".txt", ".md", ".docx", ".pdf"}  # .docx/.pdf are optional (skip if libs unavailable)
 
@@ -65,7 +73,7 @@ def chunk_text(text: str, target_words=1000, overlap_words=120) -> List[str]:
         i += target_words - overlap_words
     return chunks
 
-def build_index(src_root: Path, out_path: Path) -> None:
+def build_index(src_root: Path, out_path: Path) -> Dict[str, int]:
     src_root = src_root.resolve()
     docs_meta: List[Dict] = []
     chunks: List[Dict] = []
@@ -112,11 +120,50 @@ def build_index(src_root: Path, out_path: Path) -> None:
     }
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(index), encoding="utf-8")
-    print(f"Indexed {len(chunks)} chunks from {len(docs_meta)} files into {out_path}")
+
+    files_count, total_bytes = stats_for_source(src_root)
+    size_mb = total_bytes / (1024 * 1024) if total_bytes else 0.0
+    summary = (
+        f"Indexed {len(chunks)} chunks from {len(docs_meta)} files"
+        f" ({size_mb:.1f} MB) into {out_path}"
+    )
+    print(summary)
+    return {
+        "files": len(docs_meta),
+        "chunks": total_chunks,
+        "size_bytes": total_bytes,
+        "index_path": str(out_path),
+    }
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--src", default="stick_root/Samples")
-    ap.add_argument("--out", default="Data/index.json")
+    ap.add_argument(
+        "--source",
+        default=None,
+        help="Path to read-only source folder (defaults to current source)",
+    )
+    ap.add_argument(
+        "--out",
+        default=None,
+        help="Override index output path (defaults to managed path for the source)",
+    )
     args = ap.parse_args()
-    build_index(Path(args.src), Path(args.out))
+
+    if args.source:
+        source_path = set_current_source(args.source)
+    else:
+        source_path = get_current_source()
+
+    if not source_path.exists():
+        raise SystemExit(f"Source folder not found: {source_path}")
+
+    ok, audit_line = validate_source(str(source_path))
+    print(audit_line)
+    if not ok:
+        if audit_line.startswith("Data source requires confirm"):
+            print(f"CONFIRM_REQUIRED {audit_line}")
+            raise SystemExit(2)
+        raise SystemExit(audit_line)
+
+    out_path = Path(args.out) if args.out else index_path_for_source(source_path)
+    build_index(source_path, out_path)
