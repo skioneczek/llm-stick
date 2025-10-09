@@ -17,6 +17,15 @@ _As of 2025-10-08 (ET). This file is authoritative. Each role must read this fir
 - `docs/Decision_Log.md`, `docs/Risk_Register.md`, `docs/Security_Checklist.md`, `docs/QuickStart_card.md`, `docs/prompt_templates.md`, `tests/e2e/smoke.md`
 
 ## Micro Update — 2025-10-08 (20:10 ET)
-Done: Sync Packet v1 applied; decision + risk logs updated; smoke test captures annotated.
-Next: Initialize git and record commit hashes for Day 1 artifacts.
-Blockers: Repository still uninitialized; cannot provide commit URLs yet.
+Add commit hash and tag, e.g.:
+Commit: <hash> · Tag: v0.1-day1
+
+Move “Initialize git…” from Next → Completed.
+
+Micro-update (suggested):
+
+Done: Repo initialized; v0.1-day1 tagged; links added.
+
+Next: Start Day 2 items (model + voice + PIN lifecycle).
+
+Blockers: None.

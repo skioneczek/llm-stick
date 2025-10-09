@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+
+# Envs / build
+.venv/
+env/
+dist/
+build/
+
+# App data (derived or private)
+Data/index.json
+Data/memory_ledger.json
+Data/tmp/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
