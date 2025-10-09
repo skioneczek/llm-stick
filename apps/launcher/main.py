@@ -1,19 +1,52 @@
 # apps/launcher/main.py
-import sys, os, argparse
+import sys
+import os
+import argparse
 from pathlib import Path
 
 # Make package imports work when launched as a module
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from services.preflight.mode_state import set_mode, Mode, set_adapters_active, set_guards_ok
 from services.preflight.host_alias import bind_host_path
 from services.preflight.adapter_detect import adapters_active
-from services.security import net_guard
-from services.retriever.query import run as run_query
-from services.security.pin_gate import (
-    unlock_with_pin, change_pin, reset_with_recovery, first_boot_phrase_if_any
-)
 from services.preflight.audit import audit_voice  # reuse the existing voice audit line
+from services.retriever import query as retriever
+from services.security import net_guard, logs as security_logs, sandbox_check
+from services.security.pin_gate import (
+    unlock_with_pin,
+    change_pin,
+    reset_with_recovery,
+    first_boot_phrase_if_any,
+)
+from services.voice import tts_stub, stt_stub
+
+
+def _voice_single_turn(args) -> None:
+    """Run a single Ready → listen → answer → speak loop."""
+    tts_stub.speak("Ready.")
+    utterance = stt_stub.listen()
+    if not utterance:
+        tts_stub.speak("No input captured.")
+        return
+
+    index_path = Path(args.index)
+    if not index_path.exists():
+        msg = "Index not found. Build it first: python -m services.indexer.build_index"
+        print(msg)
+        tts_stub.speak("Index missing.")
+        return
+
+    index = retriever.load_index(index_path)
+    hits = retriever.top_hits(index, utterance, k=8)
+    answer, cites = retriever.extractive_answer(utterance, hits)
+    print(answer)
+    if cites:
+        print()
+    retriever._print_sources(cites)
+
+    first_line = answer.splitlines()[0] if answer else "No answer available."
+    tts_stub.speak(first_line)
 
 
 def boot(args):
@@ -34,6 +67,10 @@ def boot(args):
     elif mode == Mode.HARDENED:
         tmp_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "Data", "tmp"))
         guards_ok = net_guard.apply_hardened_guards(tmp_root)
+        ok, message = sandbox_check.verify_temp_sandbox()
+        print(message)
+        if not ok:
+            guards_ok = False
     elif mode == Mode.PARANOID:
         # In Paranoid we rely on adapters being OFF; we don't patch sockets here.
         guards_ok = True
@@ -57,9 +94,12 @@ def boot(args):
     # 7) Optional Q&A against the local index (post-audit, inside guarded process)
     if args.ask:
         idx = Path(args.index)
-        run_query(args.ask, index_path=idx)
+        retriever.run(args.ask, index_path=idx)
+    elif args.voice:
+        _voice_single_turn(args)
 
-def main():
+
+def main() -> None:
     ap = argparse.ArgumentParser(description="LLM Stick launcher (offline, guarded)")
     ap.add_argument("--mode", default="standard", choices=["standard", "hardened", "paranoid"])
     ap.add_argument("--pin", default="123456", help="6-digit PIN")
@@ -67,12 +107,17 @@ def main():
     ap.add_argument("--probe", action="store_true", help="Inline DNS/socket probe after guards")
     ap.add_argument("--ask", default=None, help="Ask a question against the local index")
     ap.add_argument("--index", default="Data/index.json", help="Path to index.json (default: Data/index.json)")
+    ap.add_argument("--clear-logs", action="store_true", help="Clear on-stick logs and exit")
+    ap.add_argument("--panic", action="store_true", help="Wipe temp workspace and exit")
 
     # PIN lifecycle ops
-    ap.add_argument("--change-pin", nargs=2, metavar=("CURRENT","NEW"), help="Change PIN (6 digits)")
-    ap.add_argument("--reset-pin", nargs=2, metavar=("PHRASE","NEW"), help="Reset PIN using recovery phrase")
-    ap.add_argument("--show-first-boot-phrase", action="store_true",
-                    help="Print the generated recovery phrase if keys were just created")
+    ap.add_argument("--change-pin", nargs=2, metavar=("CURRENT", "NEW"), help="Change PIN (6 digits)")
+    ap.add_argument("--reset-pin", nargs=2, metavar=("PHRASE", "NEW"), help="Reset PIN using recovery phrase")
+    ap.add_argument(
+        "--show-first-boot-phrase",
+        action="store_true",
+        help="Print the generated recovery phrase if keys were just created",
+    )
 
     args = ap.parse_args()
 
@@ -85,6 +130,14 @@ def main():
             print("*** DO NOT LOSE THIS PHRASE ***\n")
         else:
             print("Recovery phrase already set (not shown). Keep your printed copy secure.")
+
+    # Handle maintenance commands and exit early
+    if args.clear_logs:
+        print(security_logs.clear_logs())
+        return
+    if args.panic:
+        print(security_logs.wipe_temps())
+        return
 
     # Handle PIN change/reset commands and exit
     if args.change_pin:

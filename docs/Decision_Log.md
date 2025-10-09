@@ -7,8 +7,5 @@
 - **2025-10-08** Adopt shared audit surface (`services/preflight/audit.py`). Owners: Security (PIN/mode), Integrator (host alias), Designer (voice). Due EOD.
 - **2025-10-08** Capture Standard/Hardened `--probe`+`--ask` transcripts in `tests/e2e/smoke.md` as acceptance evidence. Owner: Integrator Lead. Deadline: 2025-10-08 ET. Rationale: Prove offline enforcement and citation flow on Samples corpus.
 - **2025-10-09** PIN lifecycle files staged under `Data/security/` with lockout counters and recovery rotation workflow. Owner: Security Lead. Deadline: 2025-10-09 ET. Rationale: Support PIN change/reset policy before crypto integration.
-- **2025-10-09** Day 2 execution plan locked. Owner: Program Manager. Deadline: 2025-10-09 ET. Rationale: Coordinate cross-team deliverables for second-day goals.
-  - 10:30 ET  Security Lead: Replace `services/security/pin_gate.py` stub with encrypted Data vault handshake and refresh audits.
-  - 13:00 ET  Designer & Accessibility Lead: Finalize Voice Mode enable/disable confirmations in `apps/ui/voice_script.md` and `apps/ui/states.md`.
-  - 15:30 ET  Data Lead: Re-run Samples index rebuild (`services/indexer/build_index.py`) and attach metadata notes to `Data/index.json`.
-  - 17:00 ET  Integrator Lead: Smoke-test all Start-* launchers post-changes and archive logs under `tests/e2e/`.
+- **2025-10-09T16:55Z** Day 2 acceptance slice locked (PIN lifecycle, guard probes, sandbox, voice stub). Owner: Program Manager. Deadline: 2025-10-09T21:00Z. Rationale: Establish verification scope for Day-2 deliverables.
+- **2025-10-09T16:55Z** `tests/e2e/day2.md` mirrors `docs/Acceptance_Script.md` step-for-step. Owner: Integrator Lead. Deadline: 2025-10-09T21:00Z. Rationale: Keep automated + manual checks aligned for acceptance.

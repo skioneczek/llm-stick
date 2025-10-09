@@ -25,6 +25,12 @@
 - **Reset:** `reset_with_phrase(words, new, confirm, replacement)` matches the stored phrase, sets a fresh PIN, optionally rotates the phrase, and clears lockout state.
 - **Recovery maintenance:** `set_recovery_phrase()` bootstraps or replaces the phrase; operators must ensure words are lowercase ASCII and policy-compliant before import.
 
+## Auxiliary Controls
+- **Clear logs — completed; local only.** Triggered when `clear_logs()` removes `Data/*.log`; memory ledger stays intact unless panic escalation explicitly requests ledger wipe (future Day-3 work).
+- **Temp sandbox — verified (paths under Data/tmp).** `verify_temp_sandbox()` ensures `TMPDIR`, `TMP`, and `TEMP` all resolve inside `Data/tmp` after Hardened guard activation.
+- **Temp sandbox — failed; reverting.** Emitted when any env var missing/unresolvable or pointing outside `Data/tmp`; Hardened must roll back to Standard until resolved.
+- **Panic semantics.** Voice panic wipes temps via `wipe_temps()` and exits but does **not** clear `Data/memory_ledger.json` by default; a “panic-and-forget” pathway will handle ledger purge in Day-3 scope.
+
 ## Mode Enforcement Reference
 - **Standard**: Adapters may remain active; must prove outbound sockets blocked internally and log result using `STANDARD_AUDIT` when proceeding.
 - **Hardened**: Same as Standard plus DNS resolver disabled and privileges reduced; emit `HARDENED_AUDIT` confirming clamps with adapters noted.

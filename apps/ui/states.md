@@ -15,5 +15,8 @@
 | Speaking | `earcon_speaking.wav` lead-in then response | High-contrast text of response; Scroll controls; Stop/Repeat/Summarize/Sources/Panic | Spacebar pauses speech; R repeats; S stops |
 | Post-Response Prompt | If Voice Mode ON: "Hold space to ask more." otherwise silent | 36pt prompt "Hold space to ask more"; commands remain | Spacebar restarts Listening; menu hotkeys |
 | Sources Requested | Voice Mode ON: spoken list only if user asked; otherwise silent | High-contrast source list; collapsible details hiding PII by default | Arrow keys expand/collapse; Enter select; Esc exits |
+| Sources Panel Close | Silent unless Voice Mode ON (then reads "Sources hidden.") | Panel slides closed; latest answer remains; helper text "Say or click Sources to open again" | Esc or Enter closes; S reopens |
+| Panic Prompt | Silent until confirmed | Modal "Panic clears temporary data and exits" with two buttons: Cancel / Confirm; aria-describedby explains effect | Tab cycles buttons; Enter activates; Esc cancels |
+| Panic Execution | Silent (no speech) | Screen fades to high-contrast banner "Panic in progress…"; progress indicator; app quits after data cleared | Keyboard locked except Esc to cancel within 3s grace |
 | Security Slider Change (Standard→Hardened) | Silent | Confirmation banner "Security set to Hardened"; enforcement audit line | Tab/Enter acknowledge; Esc Panic |
 | Security Slider Change (→ Paranoid) | "Paranoid mode on. Network must be off." | Banner requiring adapters off; refuse to continue until compliance | Tab cycles checklist; Enter re-run check; commands limited to Panic |

@@ -3,7 +3,7 @@
 ## Launch (Voice Mode OFF)
 - Screen: High-contrast 6-digit PIN pad; large keys, focus ring on first digit.
 - Audio: Silent. Voice Mode toggle visibly set to OFF.
-- Prompts: 32–48pt text instructing "Enter your 6-digit PIN".
+- Prompts: 32–48pt text instructing "Enter your 6-digit PIN" with helper copy "Voice Mode is optional and stays off until you turn it on." (aria-describedby for keypad instructions).
 
 ## PIN Entry
 - User enters PIN via large on-screen buttons or keyboard digits.
@@ -14,6 +14,10 @@
 - Screen: Large-text command menu (Stop, Repeat, Summarize, Sources, Panic); prominent text ask box with 36pt label "Type your question" and placeholder "Press Enter to submit"; Voice Mode toggle OFF with helper text "Voice Mode is off — use the text box or commands.".
 - Audio: Silent.
 - User may enable Voice Mode via toggle (persisted setting) or submit text questions.
+
+## Voice Mode Availability Copy
+- Banner copy (if user opens toggle info): "Voice Mode processes speech locally. Turn it on only when you want to talk."
+- Screen reader note: aria-live "polite" message "Voice Mode is optional. All responses stay on this device." when toggle receives focus.
 
 ## Text Ask Box (Always Available)
 - Location: Center column below command menu; 36pt label, 48pt input text, 60px high submit button labelled "Ask"; supports keyboard Enter and Shift+Enter for new line.
@@ -52,6 +56,12 @@
 - Action: User toggles Voice Mode OFF.
 - Audio: "Voice Mode disabled. Use buttons or keyboard." (short confirmation).
 - Screen: Hold-to-Talk control hides; toggle shows OFF with helper text "Voice Mode is off — type to ask"; text ask box regains focus.
+
+## Voice Mode Error Lines (no PII)
+- "We didn’t hear anything. Try again with the spacebar held." (listening timeout)
+- "Microphone not found. Use the text box or check your device." (hardware missing)
+- "Voice Mode paused while security check runs. Type your question instead." (guards reapplying)
+- All error lines surface as 36pt banners with aria-live "assertive" and no spoken output unless Voice Mode remains ON.
 
 ## Earcon Specifications
 - Listening: `earcon_listening.wav` – 400 Hz sine chirp rising 200 ms, played once; <60 dB.

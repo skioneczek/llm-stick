@@ -16,13 +16,14 @@ _As of 2025-10-09 (ET). This file is authoritative. Each role must read this fir
 ## Links / Files to read first
 - `docs/Decision_Log.md`, `docs/Risk_Register.md`, `docs/Security_Checklist.md`, `docs/QuickStart_card.md`, `docs/prompt_templates.md`, `tests/e2e/smoke.md`
 
-## Next — Day 2 Schedule (2025-10-09)
-- **10:30 ET — Security Lead:** Replace `services/security/pin_gate.py` stub with encrypted Data vault handshake and align audits.
-- **13:00 ET — Designer & Accessibility Lead:** Finalize Voice Mode enable/disable confirmations in `apps/ui/voice_script.md` and `apps/ui/states.md`.
-- **15:30 ET — Data Lead:** Rebuild Samples index via `services/indexer/build_index.py` and annotate `Data/index.json` metadata.
-- **17:00 ET — Integrator Lead:** Re-run Start-* smoke tests after updates; archive logs under `tests/e2e/`.
+## Day 2 Plan (In Progress — 2025-10-09)
+- **Security Lead (13:30 ET deliverable):** Ship encrypted PIN vault swap (`services/security/pin_gate.py`, `services/security/keystore.py`) with updated audits and lockout logging.
+- **Designer & Accessibility Lead (17:00 ET deliverable):** Finalize Voice Mode enable/disable confirmations and large-text mock updates in `apps/ui/voice_script.md` and `apps/ui/states.md`.
+- **Data Lead (18:30 ET deliverable):** Rebuild Samples index via `services/indexer/build_index.py`; attach provenance note inside `Data/index.json`.
+- **Integrator Lead (20:00 ET deliverable):** Execute `tests/e2e/day2.md` flows; archive launcher + guard logs under `tests/e2e/artifacts/`.
+- **Program Manager (21:00 ET deliverable):** Close acceptance run per `docs/Acceptance_Script.md`; confirm risk review for R-001 with new probes.
 
-## Micro Update — 2025-10-09 (10:05 ET)
-Done: Day 2 schedule logged in `docs/Decision_Log.md` and this board.
-Next: Execute Security/Design/Data/Integrator milestones on schedule.
-Blockers: None; awaiting Security vault handoff at 10:30 ET.
+## Micro Update — 2025-10-09 (12:58 ET)
+Done: Published Day 2 acceptance slice (`docs/Acceptance_Script.md`) and mirrored checklist (`tests/e2e/day2.md`); logged UTC decisions.
+Next: Wait on Security vault handoff and Data index rebuild to execute acceptance.
+Blockers: None; monitor R-001 during guard probes tonight.
