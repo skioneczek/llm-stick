@@ -5,13 +5,12 @@ import argparse
 import json
 import os
 import platform
-import subprocess
 import sys
-import threading
-from functools import partial
 from hashlib import sha256
 from pathlib import Path
 from typing import Dict, Iterable, Optional, Tuple
+
+from . import invoke as invoke_lib
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 PROFILES_PATH = Path(__file__).resolve().parent / "profiles.json"
@@ -108,8 +107,11 @@ def observed_sha256(path: Path) -> str:
 def verify_checksums(profile_name: str, assets: Iterable[Path]) -> None:
     manifest = load_manifest()
     if manifest is None:
-        print("LLM checksum manifest missing (non-fatal today).")
-        return
+        print(
+            "LLM checksum manifest missing. Run packaging/checksums/make_manifest.py before invoking the wrapper.",
+            file=sys.stderr,
+        )
+        sys.exit(EXIT_MISSING_ASSET)
 
     problems = []
     for asset in assets:
@@ -166,28 +168,6 @@ def build_command(profile: dict, binary_path: Path, model_path: Path, prompt: st
     return cmd
 
 
-def stream_subprocess(proc: subprocess.Popen) -> int:
-    def drain_stream(stream, writer):
-        for chunk in iter(partial(stream.read, 1), ""):
-            writer.write(chunk)
-            writer.flush()
-
-    stderr_thread = threading.Thread(
-        target=drain_stream, args=(proc.stderr, sys.stderr), daemon=True
-    )
-    stderr_thread.start()
-
-    try:
-        drain_stream(proc.stdout, sys.stdout)
-    except KeyboardInterrupt:
-        proc.terminate()
-    finally:
-        proc.wait()
-        stderr_thread.join(timeout=0.5)
-
-    return proc.returncode
-
-
 def run_profile(profile_name: str, profile: dict, prompt: str) -> None:
     binary_path = resolve_rel_path(profile["bin_rel"])
     model_path = resolve_rel_path(profile["model_rel"])
@@ -199,26 +179,20 @@ def run_profile(profile_name: str, profile: dict, prompt: str) -> None:
 
     command = build_command(profile, binary_path, model_path, prompt)
     try:
-        process = subprocess.Popen(
+        result = invoke_lib.invoke(
             command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            bufsize=1,
+            prompt,
+            profile_name=profile_name,
+            stdout_sink=lambda chunk: (sys.stdout.write(chunk), sys.stdout.flush()),
+            stderr_sink=lambda chunk: (sys.stderr.write(chunk), sys.stderr.flush()),
         )
     except FileNotFoundError as exc:
         print(f"Failed to start llama.cpp binary: {exc}", file=sys.stderr)
         sys.exit(EXIT_MISSING_ASSET)
 
-    if process.stdout is None or process.stderr is None:
-        print("Failed to capture llama.cpp output streams", file=sys.stderr)
-        sys.exit(EXIT_MISSING_ASSET)
-
-    return_code = stream_subprocess(process)
-
-    if return_code != 0:
-        print(f"llama.cpp exited with status {return_code}", file=sys.stderr)
-        sys.exit(return_code)
+    if result.returncode != 0:
+        print(f"llama.cpp exited with status {result.returncode}", file=sys.stderr)
+        sys.exit(result.returncode)
 
 
 def list_profiles(profiles: Dict[str, dict]) -> None:

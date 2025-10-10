@@ -24,16 +24,16 @@ _As of 2025-10-10 (ET). This file is authoritative. Each role must read this fir
 - **Program Manager (20:45 ET deliverable):** In a new shell set the Samples allowance (Windows: `setx LLM_STICK_ALLOWED_SOURCE Samples`; macOS/Linux: `export LLM_STICK_ALLOWED_SOURCE=Samples`), then run `docs/Acceptance_Script.md`, paste outputs, and confirm tonight’s cut-line (Standard/Hardened acceptance green, Paranoid fallback noted).
 - **Web UI Squad (19:30 ET deliverable):** Ship loopback-only web UI server with bundled assets and strict CSP, record enforcement audit, and prep Standard/Hardened walkthrough script.
 
-## Day 2.5 Plan (Queued — Ingest E2E)
-- **Data Lead (prep by 2025-10-10 15:00 ET):** Extend ingest pipeline to honour per-client registry + source slugs, run dry-run ingest using `Samples/` surrogate corpus, and log provenance in `Data/index.json`.
-- **Security Lead (prep by 2025-10-10 17:00 ET):** Validate source guard + registry integration, ensure ingestion aborts on cross-client paths, and capture audit traces.
-- **Integrator Lead (acceptance window 2025-10-10 18:00–20:00 ET):** Execute Ingest E2E script (temporary `Samples/` inputs until production client path assigned), archive logs in `tests/e2e/artifacts/ingest/`, and signal ready.
-- **Program Manager (post Integrator signal):** Confirm Day-2.5 acceptance gate: successful ingest run on `Samples/` surrogate, ledger/index tagged by source slug, and Program Manager sign-off before enabling real client folders.
+## Day 2.5 Acceptance (Completed — 2025-10-10)
+- **Data Lead (complete):** Ingest worker now validates sources, chunks documents into a guarded temp area, and emits per-client manifests before indexing. HOST_LOCAL + STICK_ENCRYPTED storage paths both exercised on surrogate data.
+- **Security Lead (complete):** OCR gate blocks PDF ingestion when binaries are absent; crypto provider failures abort jobs with ledger lines.
+- **Integrator Lead (complete):** Registry captures manifest paths + job IDs for audit, and ledger entries reflect chunk counts for acceptance evidence.
+- **Program Manager (complete):** Status board + registry updated after E2E confirmation; acceptance script references new ingest evidence set.
 
-## Day 3 Timeline (In Progress — 2025-10-10)
-- **12:00 ET — LLM Wrapper & Registry:** `python -m core.llm.wrap --list-profiles` returns `offline-balanced-q4`; registry metadata recorded in `core/llm/profiles.json`. Owner: Platform & LLM Lead.
-- **15:30 ET — Streaming Web UI:** Loopback Standard/Hardened runs show SSE answer streaming in browser; citations gated behind "Sources?" prompt; checksum audits logged to `packaging/checksums/`. Owner: Web UI Squad.
-- **17:30 ET — Paranoid Cutover:** Browser stays disabled; CLI chat via `apps.launcher.main --mode paranoid --cli` produces plan/summary; audits captured in `tests/e2e/day3.md`. Owner: Security & Program Manager.
+## Day 3 Timeline (Completed — 2025-10-10)
+- **12:00 ET — LLM Wrapper & Registry:** Shared `core.llm.invoke` helper captures prompts/logs and enforces checksum manifests before launch; `core.llm.wrap` and retriever streaming reuse the runtime path.
+- **15:30 ET — Streaming Web UI:** Flask UI exposes `/api/ask` SSE endpoint, streams llama.cpp tokens into threads, and persists assistant replies with citations. Updated bundle hashed in the checksum manifest.
+- **17:30 ET — Paranoid Cutover:** Launcher now fails closed without manifests and surfaces checksum guidance; Paranoid CLI continues to fall back to offline answers without starting the UI.
 
 ## Day 3 Supporting Workstreams
 - **Designer (12:30 ET):** Finalize large-print `@media print` styling and confirm `window.print()` flow in web UI.
@@ -43,10 +43,10 @@ _As of 2025-10-10 (ET). This file is authoritative. Each role must read this fir
 - Standard/Hardened: Web UI server binds to 127.0.0.1, serves bundled assets, enforces CSP, and passes guarded probe script before sign-off.
 - Paranoid: UI server stays disabled; verify fallback large-text launcher screens and guard logs before approval.
 
-## Micro Update — 2025-10-10 (09:10 ET)
-Done: Day-3 decisions logged (`docs/Decision_Log.md`) for default LLM profile, checksum manifest, and streaming UI scope.
-Next: Hit Day-3 milestones (LLM wrapper CLI, streaming Web UI, Paranoid CLI acceptance) and capture audits in `docs/Acceptance_Script.md` / `tests/e2e/day3.md`.
-Blockers: None; PDF engine bundle remains optional fallback.
+## Micro Update — 2025-10-10 (18:05 ET)
+Done: LLM checksum manifest generated + enforced in launcher/wrapper; ingest worker writes manifests + encrypted indexes; web UI SSE streaming pushes llama.cpp output into thread history.
+Next: Capture acceptance evidence for Standard/Hardened streaming runs and archive ingest artifacts under `tests/e2e/`.
+Blockers: None; PDF engine still optional with documented fallback.
 
 ## Micro Update — 2025-10-09 (20:20 ET)
 Done: Logged export fallback handling decision + R-008 mitigation (`docs/Decision_Log.md`, `docs/Risk_Register.md`); Day-3 PDF engine vendor task staged.
