@@ -77,7 +77,11 @@ def _verify_checksum_manifest() -> Tuple[bool, str, int]:
 
     manifest_path = LLM_MANIFEST_PATH
     if not manifest_path.exists():
-        _LLM_CHECK_CACHE = (True, "Checksum manifest not found; skipping verification.", 0)
+        _LLM_CHECK_CACHE = (
+            False,
+            "Checksum manifest not found. Run packaging/checksums/make_manifest.py to stage Day-3 assets.",
+            0,
+        )
         return _LLM_CHECK_CACHE
 
     try:

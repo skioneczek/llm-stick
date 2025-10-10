@@ -322,7 +322,7 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
         try {
-          await ask(prompt);
+          await ask(threadId, prompt);
           form.reset();
           textarea?.focus();
           activeThreadId = threadId;
@@ -469,14 +469,24 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  async function ask(prompt) {
+  async function ask(threadId, prompt) {
     const realtime = document.querySelector('#toggle-realtime')?.checked ?? false;
     const source = window.__currentSource || "";
     const res = await fetch('/api/ask', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ prompt, realtime, source_path: source })
+      body: JSON.stringify({ thread_id: threadId, prompt, realtime, source_path: source })
     });
+    if (!res.ok) {
+      let errorText = 'Request failed';
+      try {
+        const failure = await res.json();
+        errorText = failure.error || errorText;
+      } catch (_) {
+        errorText = res.statusText || errorText;
+      }
+      throw new Error(errorText);
+    }
     const { sse } = await res.json();
 
     const es = new EventSource(sse);
@@ -487,9 +497,13 @@ document.addEventListener("DOMContentLoaded", () => {
       appendAssistantTokens(ev.data);
       buf += ev.data;
     };
-    es.addEventListener('meta', (ev) => {
+    es.addEventListener('meta', async (ev) => {
       const meta = JSON.parse(ev.data || '{}');
       finishAssistantBubble(buf, meta.sources || []);
+      await loadThreads();
+      if (threadId) {
+        openThread(threadId, { scroll: false });
+      }
     });
     es.addEventListener('end', () => es.close());
     es.addEventListener('error', () => { safeToast('Stream error'); es.close(); });
