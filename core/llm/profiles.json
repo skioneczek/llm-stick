@@ -1,0 +1,17 @@
+{
+  "offline-balanced-q4": {
+    "label": "7B Q4_0 (balanced, CPU-only)",
+    "default": true,
+    "bin_rel": "App/bin/llama/llama.exe|llama",
+    "model_rel": "App/models/llm/7b/gguf/model.q4_0.gguf",
+    "ctx": 4096,
+    "threads_env": "LLM_STICK_THREADS",
+    "gpu_layers": 0,
+    "params": [
+      "--temp",
+      "0.7",
+      "--repeat_penalty",
+      "1.1"
+    ]
+  }
+}

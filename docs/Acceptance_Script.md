@@ -104,3 +104,61 @@ Expected: Messages match `apps/ui/voice_script.md`: `"Voice Mode enabled. Hold s
 
 ### Prompt/Answer Template Check
 Re-use Standard/Hardened launcher runs above to confirm answers follow `docs/prompt_templates.md` patterns (plan → answer → sources) and require explicit "Sources" request before speaking citations.
+
+# Acceptance Script — Day 3 (2025-10-10)
+
+## Preconditions
+- Device remains air-gapped; adapters stay ON for Standard/Hardened streaming checks and OFF for Paranoid validation.
+- Default LLM profile targeted for Day-3 (`offline-balanced-q4`) and model assets staged under `App/models/llm/`; wrapper tooling lives in `core/llm/`.
+- SHA256 manifests prepared beneath `packaging/checksums/` (one JSON manifest + `.sha256` files). Keep Windows `Get-FileHash` available for spot checks.
+- Web UI static bundle rebuilt (including `apps/webui/static/app.js`) and SSE streaming flag enabled by Day-3 deliverable.
+
+## Scenario 6 — LLM Wrapper & Registry (12:00 ET)
+```powershell
+python -m core.llm.wrap --list-profiles
+```
+Expected: Table lists `offline-balanced-q4` with footprint metadata and marks it `(default)`.
+
+```powershell
+python -m core.llm.wrap --run --profile offline-balanced-q4 --prompt "Summarize Client A trust highlights."
+```
+Expected: Wrapper streams tokens to stdout without network calls; exit code 0 when binaries/models present. On missing assets, returns actionable error referencing `App/bin/llama/` and `App/models/llm/` paths.
+
+## Scenario 7 — Checksum Policy Enforcement (13:15 ET)
+```powershell
+Get-ChildItem packaging/checksums/*.sha256 | ForEach-Object { Get-Content $_ }
+```
+Expected: Manifests list SHA256 for each Day-3 artifact (LLM binaries, GGUF models, web assets).
+
+```powershell
+python - <<'PY'
+import json, subprocess, pathlib
+manifest = json.load(open('packaging/checksums/manifest.json', 'r', encoding='utf-8'))
+for rel_path, expected in manifest.items():
+    path = pathlib.Path(rel_path)
+    result = subprocess.run(['powershell', '-NoLogo', '-Command', f"Get-FileHash -Algorithm SHA256 '{path}'"], capture_output=True, text=True)
+    hash_line = next((line for line in result.stdout.splitlines() if line.strip().startswith('SHA256')), '')
+    actual = hash_line.split(':', 1)[-1].strip()
+    print(rel_path, actual == expected)
+PY
+```
+Expected: Every entry prints `True`. Any mismatch blocks acceptance until corrected.
+
+## Scenario 8 — Standard Streaming Web UI (15:30 ET)
+```powershell
+python -m apps.launcher.main --mode standard --pin 123456 --probe --ui standard --ask "List open questions for Client A"
+```
+Expected: Hardened-style audits for Standard mode (DNS/SOCKET blocked) then `Loopback Web UI available at http://127.0.0.1:<port>`. Browser opens automatically. In the UI, the answer renders incrementally (streaming chunks) before citations appear—verifiable in browser dev tools Network tab (`/stream` SSE).
+
+## Scenario 9 — Hardened Streaming Parity (15:30 ET)
+```powershell
+python -m apps.launcher.main --mode hardened --pin 123456 --probe --ui enhanced --ask "Outline checksum policy for Day 3"
+```
+Expected: Hardened audit includes temp sandbox verification (`Temp sandbox — verified`). UI loads in enhanced (large text) view with the same streaming behaviour as Standard. Guard prints continue to show DNS/socket blocked.
+
+## Scenario 10 — Paranoid CLI Fallback (17:30 ET)
+```powershell
+python -m apps.launcher.main --mode paranoid --pin 123456 --probe --ask "Confirm Paranoid fallback behaviour"
+```
+Expected: Paranoid audit refuses to launch UI (`UI server disabled in Paranoid mode.`) while CLI answer prints plan + bullets and cites `Sources` on demand. No browser window opens. Capture console transcript and checksum verification logs for the acceptance bundle.
+

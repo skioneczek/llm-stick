@@ -5,11 +5,11 @@ import argparse
 import json
 import time
 import subprocess
+import hashlib
 import threading
 import webbrowser
 import atexit
 import re
-import importlib.util
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
@@ -54,6 +54,57 @@ TEMP_DECRYPT_DIR = Path("Data/tmp/hotswap")
 _URL_RE = re.compile(r"(http://127\.0\.0\.1:\d+)")
 _UI_PROCESS: Optional[subprocess.Popen[str]] = None
 
+LLM_MANIFEST_PATH = Path("packaging/checksums/manifest.json")
+_LLM_CHECK_CACHE: Optional[Tuple[bool, str, int]] = None
+LLM_ENABLED = True
+LLM_DISABLED_REASON: Optional[str] = None
+
+
+def _checksum_digest(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _verify_checksum_manifest() -> Tuple[bool, str, int]:
+    global _LLM_CHECK_CACHE
+    if _LLM_CHECK_CACHE is not None:
+        return _LLM_CHECK_CACHE
+
+    manifest_path = LLM_MANIFEST_PATH
+    if not manifest_path.exists():
+        _LLM_CHECK_CACHE = (True, "Checksum manifest not found; skipping verification.", 0)
+        return _LLM_CHECK_CACHE
+
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        _LLM_CHECK_CACHE = (False, f"Checksum failure: manifest parse error ({exc})", 0)
+        return _LLM_CHECK_CACHE
+
+    count = 0
+    for rel_path, expected in manifest.items():
+        rel_str = str(rel_path)
+        expected_hash = str(expected).strip().lower()
+        target = Path(rel_str)
+        if not target.exists():
+            _LLM_CHECK_CACHE = (False, f"Checksum failure: {rel_str} (missing)", count)
+            return _LLM_CHECK_CACHE
+        actual_hash = _checksum_digest(target).lower()
+        count += 1
+        if actual_hash != expected_hash:
+            _LLM_CHECK_CACHE = (False, f"Checksum failure: {rel_str}", count)
+            return _LLM_CHECK_CACHE
+
+    _LLM_CHECK_CACHE = (True, f"Checksums verified ({count} items).", count)
+    return _LLM_CHECK_CACHE
+
+
+def llm_assets_verified() -> bool:
+    return _verify_checksum_manifest()[0]
+
 
 def _resolve_index_path(index_override: str | None) -> Path:
     if index_override:
@@ -64,6 +115,9 @@ def _resolve_index_path(index_override: str | None) -> Path:
 
 def _voice_single_turn(args, prompt: str | None = None, *, mode: Mode | None = None) -> None:
     """Run a single Ready → listen → answer → speak loop."""
+    if not LLM_ENABLED:
+        print(LLM_DISABLED_REASON or "LLM disabled due to checksum failure.")
+        return
     tts_stub.speak("Ready.")
     utterance = prompt if prompt is not None else stt_stub.listen()
     if not utterance:
@@ -377,6 +431,9 @@ def _register_ui_cleanup(proc: subprocess.Popen[str]) -> None:
 
 
 def _run_ui_loop(view: str) -> None:
+    if not LLM_ENABLED:
+        print(LLM_DISABLED_REASON or "LLM disabled due to checksum failure.")
+        print("UI launcher continuing with retriever-only mode.")
     ok, audit = net_guard.allow_loopback_only()
     print(audit)
     if not ok:
@@ -502,6 +559,12 @@ def boot(args):
     # 5) Voice audit line (toggle state only; actual TTS/STT is stubbed elsewhere)
     print(audit_voice(args.voice).msg)
 
+    checksum_ok, checksum_msg, _ = _verify_checksum_manifest()
+    print(checksum_msg)
+    global LLM_ENABLED, LLM_DISABLED_REASON
+    LLM_ENABLED = checksum_ok
+    LLM_DISABLED_REASON = None if checksum_ok else checksum_msg
+
     # 6) Optional inline probe (only meaningful in Standard/Hardened)
     if args.probe and mode in (Mode.STANDARD, Mode.HARDENED):
         dns_line, sock_line = net_guard.probe_text()
@@ -510,9 +573,15 @@ def boot(args):
 
     # 7) Optional Q&A against the local index (post-audit, inside guarded process)
     if args.ask and args.voice:
-        _voice_single_turn(args, prompt=args.ask, mode=mode)
+        if LLM_ENABLED:
+            _voice_single_turn(args, prompt=args.ask, mode=mode)
+        else:
+            print(LLM_DISABLED_REASON or "LLM disabled due to checksum failure.")
     elif args.ask:
-        retriever.run(args.ask, index_path=args.index, use_client=args.use_client)
+        if LLM_ENABLED:
+            retriever.run(args.ask, index_path=args.index, use_client=args.use_client)
+        else:
+            print(LLM_DISABLED_REASON or "LLM disabled due to checksum failure." )
     elif args.voice:
         _voice_single_turn(args, mode=mode)
 
