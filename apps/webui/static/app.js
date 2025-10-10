@@ -18,6 +18,61 @@ document.addEventListener("DOMContentLoaded", () => {
       .slice(0, 120) || "thread";
   }
 
+  async function handleExport(threadId, fileTitle = "thread") {
+    if (!threadId) return;
+    const printableUrl = `/_print/${threadId}`;
+    try {
+      const response = await fetch(`/export/pdf/${threadId}`);
+      const auditHeader = response.headers.get("X-Action-Audit");
+      const contentType = (response.headers.get("Content-Type") || "").toLowerCase();
+      if (response.ok && contentType.includes("application/pdf")) {
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = objectUrl;
+        anchor.download = `${sanitizeFilename(fileTitle || threadId)}.pdf`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+        log(auditHeader || `PDF exported: ${threadId}`);
+        return;
+      }
+
+      let fallback = null;
+      try {
+        fallback = await response.json();
+      } catch (_) {
+        fallback = null;
+      }
+
+      if (fallback && fallback.fallback === "print-to-pdf") {
+        window.open(printableUrl, "_blank", "noopener");
+        log(auditHeader || `PDF export fallback → print: ${threadId}`);
+      } else {
+        log(`PDF export failed: Unexpected response (${response.status}).`);
+      }
+    } catch (err) {
+      window.open(printableUrl, "_blank", "noopener");
+      log(`PDF export failed: ${err.message}`);
+    }
+  }
+
+  function openThread(threadId, options = {}) {
+    activeThreadId = threadId || null;
+    expandThread(threadId, options);
+    if (threadId) {
+      const element = document.getElementById(`thr-${threadId}`);
+      if (element) {
+        try {
+          element.scrollIntoView({ behavior: "smooth", block: "start" });
+        } catch (_) {
+          element.scrollIntoView();
+        }
+      }
+    }
+  }
+
   function expandThread(threadId, options = {}) {
     const { scroll = true } = options;
     if (!threadId) return;
@@ -98,6 +153,7 @@ document.addEventListener("DOMContentLoaded", () => {
       li.className = "thread-item";
       li.dataset.threadId = thread.id;
       li.dataset.threadTitle = thread.title || "thread";
+      li.id = `thr-${thread.id}`;
 
       const header = document.createElement("header");
       const title = document.createElement("h3");
@@ -115,13 +171,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const actions = document.createElement("div");
       actions.className = "actions";
+      const archiveLabel = thread.archived ? "Restore this conversation" : "Archive this conversation";
       actions.innerHTML = `
-        <button class="open-thread" type="button" aria-label="Open this thread">Open Thread</button>
-        <button class="archive-thread" type="button" data-archive="${thread.archived ? "false" : "true"}">
+        <button class="open-thread" type="button" aria-label="Open this thread" title="Expand and focus this conversation.">Open thread</button>
+        <button class="archive-thread" type="button" data-archive="${thread.archived ? "false" : "true"}" aria-label="${archiveLabel}" title="${archiveLabel}">
           ${thread.archived ? "Restore" : "Archive"}
         </button>
-        <button class="print-thread" type="button" data-thread-id="${thread.id}">Print</button>
-        <button class="export-pdf" type="button" data-thread-id="${thread.id}">Export PDF</button>
+        <button class="print-thread" type="button" data-thread-id="${thread.id}" aria-label="Print large-text view" title="Print (Large Text)">Print</button>
+        <button class="export-pdf" type="button" data-thread-id="${thread.id}" aria-label="Export local PDF (fallback to Print to PDF)" title="Export PDF (local; may fall back to browser Print to PDF)">Export PDF</button>
       `;
       header.appendChild(actions);
       li.appendChild(header);
@@ -132,7 +189,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const list = document.createElement("ol");
         thread.messages.forEach((msg) => {
           const item = document.createElement("li");
-          item.className = `message ${msg.role || "assistant"}`;
+          const roleClass = (msg.role || "assistant").toString().toLowerCase();
+          const messageClasses = ["message", roleClass];
+          if (roleClass === "plan") {
+            messageClasses.push("plan");
+          }
+          item.className = messageClasses.join(" ");
           const msgHeader = document.createElement("header");
           const role = document.createElement("span");
           role.className = "role";
@@ -198,7 +260,7 @@ document.addEventListener("DOMContentLoaded", () => {
       button.addEventListener("click", (event) => {
         const li = event.currentTarget.closest(".thread-item");
         if (!li) return;
-        expandThread(li.dataset.threadId);
+        openThread(li.dataset.threadId);
       });
     });
 
@@ -258,6 +320,7 @@ document.addEventListener("DOMContentLoaded", () => {
           textarea?.focus();
           activeThreadId = threadId;
           await loadThreads();
+          openThread(threadId, { scroll: false });
         } catch (err) {
           log(`Message failed: ${err.message}`);
         }
@@ -269,33 +332,9 @@ document.addEventListener("DOMContentLoaded", () => {
         event.preventDefault();
         const li = event.currentTarget.closest(".thread-item");
         const threadId = li?.dataset.threadId;
+        const threadTitle = li?.dataset.threadTitle || threadId;
         if (!threadId) return;
-        const printableUrl = `/_print/${threadId}`;
-        const pdfUrl = `/export/pdf/${threadId}`;
-        const title = sanitizeFilename(li?.dataset.threadTitle || "thread");
-        try {
-          const resp = await fetch(pdfUrl);
-          const audit = resp.headers.get("X-Action-Audit");
-          const contentType = (resp.headers.get("Content-Type") || "").toLowerCase();
-          if (resp.ok && contentType.startsWith("application/pdf")) {
-            const blob = await resp.blob();
-            const objectUrl = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.href = objectUrl;
-            link.download = `${title}.pdf`;
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
-            log(audit || "PDF downloaded.");
-            return;
-          }
-          window.open(printableUrl, "_blank", "noopener");
-          log(audit || "PDF engine unavailable; opened printable view.");
-        } catch (err) {
-          window.open(printableUrl, "_blank", "noopener");
-          log(`PDF export failed: ${err.message}`);
-        }
+        await handleExport(threadId, threadTitle);
       });
     });
   };
@@ -336,6 +375,9 @@ document.addEventListener("DOMContentLoaded", () => {
         activeThreadId = newThreadId;
       }
       await loadThreads();
+      if (newThreadId) {
+        openThread(newThreadId, { scroll: false });
+      }
     } catch (err) {
       log(`Create thread failed: ${err.message}`);
     }
@@ -363,26 +405,6 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) {
       resultsList.textContent = "Search failed.";
       log(`Search failed: ${err.message}`);
-    }
-  });
-
-  document.getElementById("set-source-form")?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const payload = {
-      path: form.path.value,
-      force: form.force.checked,
-    };
-    try {
-      const data = await fetchJson("/set-source", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      log(`Set source: ${data.status}`);
-      await refreshSource();
-    } catch (err) {
-      log(`Set source failed: ${err.message}`);
     }
   });
 

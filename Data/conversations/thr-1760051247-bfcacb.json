@@ -1,0 +1,60 @@
+{
+  "id": "thr-1760051247-bfcacb",
+  "title": "Smoke test 3",
+  "created_at": 1760051247,
+  "updated_at": 1760052207,
+  "client_slug": "",
+  "source_slug": null,
+  "source_path": null,
+  "messages": [
+    {
+      "role": "user",
+      "text": "Hello. Tell me about Client A.",
+      "ts": 1760052187,
+      "citations": [],
+      "meta": {}
+    },
+    {
+      "role": "assistant",
+      "text": "Plan: review archives for \"Hello. Tell me about Client A.\" and ingest missing documents before answering.\n- No matching chunks found offline. Consider adding source documents or refining the question.\nAsk \"Sources?\" for file names and dates.",
+      "ts": 1760052187,
+      "citations": [],
+      "meta": {
+        "plan": "Plan: review archives for \"Hello. Tell me about Client A.\" and ingest missing documents before answering."
+      }
+    },
+    {
+      "role": "user",
+      "text": "Anything about Clien 1?",
+      "ts": 1760052201,
+      "citations": [],
+      "meta": {}
+    },
+    {
+      "role": "assistant",
+      "text": "Plan: review archives for \"Anything about Clien 1?\" and ingest missing documents before answering.\n- No matching chunks found offline. Consider adding source documents or refining the question.\nAsk \"Sources?\" for file names and dates.",
+      "ts": 1760052201,
+      "citations": [],
+      "meta": {
+        "plan": "Plan: review archives for \"Anything about Clien 1?\" and ingest missing documents before answering."
+      }
+    },
+    {
+      "role": "user",
+      "text": "list clients",
+      "ts": 1760052207,
+      "citations": [],
+      "meta": {}
+    },
+    {
+      "role": "assistant",
+      "text": "Plan: review archives for \"list clients\" and ingest missing documents before answering.\n- No matching chunks found offline. Consider adding source documents or refining the question.\nAsk \"Sources?\" for file names and dates.",
+      "ts": 1760052207,
+      "citations": [],
+      "meta": {
+        "plan": "Plan: review archives for \"list clients\" and ingest missing documents before answering."
+      }
+    }
+  ],
+  "archived": false
+}

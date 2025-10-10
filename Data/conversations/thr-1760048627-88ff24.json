@@ -1,0 +1,47 @@
+{
+  "id": "thr-1760048627-88ff24",
+  "title": "Smoke test",
+  "created_at": 1760048627,
+  "updated_at": 1760048716,
+  "client_slug": "default",
+  "source_slug": null,
+  "source_path": null,
+  "messages": [
+    {
+      "role": "user",
+      "text": "Summarize Client A trust highlights",
+      "ts": 1760048660,
+      "citations": [],
+      "meta": {}
+    },
+    {
+      "role": "user",
+      "text": "Summarize Client A trust highlights",
+      "ts": 1760048661,
+      "citations": [],
+      "meta": {}
+    },
+    {
+      "role": "user",
+      "text": "Summarize Client A trust highlights",
+      "ts": 1760048662,
+      "citations": [],
+      "meta": {}
+    },
+    {
+      "role": "user",
+      "text": "Summarize Client A trust highlights",
+      "ts": 1760048715,
+      "citations": [],
+      "meta": {}
+    },
+    {
+      "role": "user",
+      "text": "Summarize Client A trust highlights",
+      "ts": 1760048716,
+      "citations": [],
+      "meta": {}
+    }
+  ],
+  "archived": false
+}

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Print Thread</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    <style>
+        body {
+            background: #fff;
+            color: #000;
+            font-family: "Segoe UI", Arial, sans-serif;
+            font-size: 24pt;
+            line-height: 1.6;
+            padding: 2rem;
+        }
+        h1 {
+            font-size: 32pt;
+            margin: 0 0 1rem;
+        }
+        .meta {
+            font-size: 20pt;
+            margin-bottom: 1.5rem;
+        }
+        .meta span {
+            display: inline-block;
+            margin-right: 1.5rem;
+        }
+        .messages {
+            list-style: none;
+            padding: 0;
+        }
+        .message {
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            background: #fafafa;
+        }
+        .message header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 18pt;
+            color: #333;
+        }
+        .message pre {
+            white-space: pre-wrap;
+            font-size: 20pt;
+            margin-top: 0.75rem;
+        }
+        .citations {
+            margin-top: 0.75rem;
+            font-size: 16pt;
+            color: #444;
+        }
+    </style>
+</head>
+<body>
+    <h1>{{ thread['title'] or 'Untitled Thread' }}</h1>
+    <div class="meta">
+        <span><strong>Thread ID:</strong> {{ thread['id'] }}</span>
+        <span><strong>Client:</strong> {{ thread.get('client_slug') or 'default' }}</span>
+        <span><strong>Source:</strong> {{ thread.get('source_slug') or 'n/a' }}</span>
+        <span><strong>Updated:</strong> {{ thread.get('updated_at') }}</span>
+    </div>
+    <ol class="messages">
+        {% for message in thread.get('messages', []) %}
+        <li class="message">
+            <header>
+                <span>{{ message['role'].title() }}</span>
+                <span>{{ message['ts'] }}</span>
+            </header>
+            <pre>{{ message.get('text') or '' }}</pre>
+            {% if message.get('citations') %}
+            <div class="citations">
+                {% for cite in message['citations'] %}
+                <div>{{ cite.get('file') }} — {{ cite.get('date') }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ol>
+</body>
+</html>

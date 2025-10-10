@@ -17,6 +17,9 @@
 - Logging operations produce human-readable entries plus hash note; single clear control.
 - Voice panic command reliably wipes temps and exits irrespective of slider mode.
 - Post-change audit renders 1–2 line status per mode with failure reasons when applicable.
+- Loopback web UI launch prints `Loopback allowed (UI server only).` before the server URL; Paranoid mode prints `UI server disabled in Paranoid mode.` and skips launch.
+- HTTP responses include the strict CSP header (`default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`) with audit `CSP applied (offline assets only).`
+- Print endpoint (`/_print/<thread_id>`) returns `X-Action-Audit: Print invoked (local assets only).`; PDF export returns either `X-Action-Audit: PDF export (engine weasyprint|wkhtml)` or `X-Action-Audit: PDF export fallback (engine missing)`, with audit log entries "UI export: PDF emitted (local engine)." or "UI export: PDF engine missing, used print fallback." as appropriate.
 
 ## PIN Lifecycle
 - **Storage layout:** `Data/security/pin.txt` holds the 6-digit PIN; `Data/security/recovery_phrase.txt` stores the 12-word phrase (comment header + single line payload) until crypto wraps arrive.
@@ -26,16 +29,8 @@
 - **Recovery maintenance:** `set_recovery_phrase()` bootstraps or replaces the phrase; operators must ensure words are lowercase ASCII and policy-compliant before import.
 - **Source selection:** On "Set Data Folder" execute `validate_source(path)`; if it returns `Data source invalid: …` or `Data source requires confirm: …`, abort and keep the prior source until the user explicitly confirms. When validation succeeds, log `Data source validated: …`, then trigger index clear + rebuild under the guarded process before proceeding.
 
-## Auxiliary Controls
-- **Clear logs — completed; local only.** Triggered when `clear_logs()` removes `Data/*.log`; memory ledger stays intact unless panic escalation explicitly requests ledger wipe (future Day-3 work).
-- **Temp sandbox — verified (paths under Data/tmp).** `verify_temp_sandbox()` ensures `TMPDIR`, `TMP`, and `TEMP` all resolve inside `Data/tmp` after Hardened guard activation.
-- **Temp sandbox — failed; reverting.** Emitted when any env var missing/unresolvable or pointing outside `Data/tmp`; Hardened must roll back to Standard until resolved.
-- **Panic semantics.** Voice panic wipes temps via `wipe_temps()` and exits but does **not** clear `Data/memory_ledger.json` by default; a “panic-and-forget” pathway will handle ledger purge in Day-3 scope.
-- **Loopback allowance.** Standard/Hardened launch must call `allow_loopback_only()` before starting the local UI server and log `Loopback allowed (UI server only).` Paranoid mode must skip UI server entirely and emit `UI server disabled in Paranoid mode.`
-- **HTTP hardening.** Any HTTP response the stick serves must pass through `apply_secure_headers()` to enforce the CSP (`default-src 'none'; ...`) and log `CSP applied (offline assets only).`
 
 ## Mode Enforcement Reference
 - **Standard**: Adapters may remain active; must prove outbound sockets blocked internally and log result using `STANDARD_AUDIT` when proceeding.
 - **Hardened**: Same as Standard plus DNS resolver disabled and privileges reduced; emit `HARDENED_AUDIT` confirming clamps with adapters noted.
 - **Paranoid (pass)**: Require all adapters down before proceeding; sandbox networking (`unshare -n`, PF, WFP) and log via `PARANOID_PASS_AUDIT`.
-- **Paranoid (fail)**: If any adapter detected, abort immediately and emit `PARANOID_BLOCK_AUDIT`.

@@ -3,7 +3,18 @@ from __future__ import annotations
 
 from typing import Mapping
 
-CSP_HEADER = "default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; connect-src 'self'; font-src 'self'; frame-ancestors 'none'"
+CSP_HEADER = (
+    "default-src 'none';"
+    " script-src 'self';"
+    " style-src 'self';"
+    " img-src 'self';"
+    " connect-src 'self';"
+    " font-src 'self';"
+    " object-src 'none';"
+    " base-uri 'none';"
+    " form-action 'self';"
+    " frame-ancestors 'none'"
+)
 SECURE_HEADERS = {
     "Content-Security-Policy": CSP_HEADER,
     "X-Content-Type-Options": "nosniff",

@@ -1,7 +1,7 @@
 # Chat UI Specification (Accessibility First)
 
 ## Layout Overview
-- **Toolbar (top strip)**: 60pt buttons in order — System Preset dropdown, User Preset dropdown, Sources, Set Data Folder, Ingest, Hotswap, Security slider, Voice toggle, Panic. CLI button appears only in Standard View; hidden in Enhanced Visual mode.
+- **Toolbar (top strip)**: 60pt buttons in order — System Preset dropdown, User Preset dropdown, Print (Large Text), Export PDF, Sources, Set Data Folder, Ingest, Hotswap, Security slider, Voice toggle, Panic. CLI button appears only in Standard View; hidden in Enhanced Visual mode.
 - **Main area**: Split left/right with adjustable divider.
   - **Threads list (left)**: Large cards stacked vertically, 48pt titles and 36pt subtext. Default width 360px in Standard, 480px in Enhanced Visual.
   - **Conversation pane (right)**: 48pt–60pt messages, high-contrast bubbles, time stamps in 32pt.
@@ -22,10 +22,11 @@
 - Empty conversation message: 48pt italic copy "Start by typing a question." displayed until first send.
 - Archive and delete actions confirm via inline banner `role="alert"` "Thread archived. Press Undo within 3 seconds.".
 
-## Toolbar Controls
 - **System Presets dropdown**: 48pt trigger labeled "System Preset"; options show one-line summary (e.g., "Standard: 48pt sans"). `aria-label="Choose system preset"` and `aria-live` announcement when changed.
 - **User Presets dropdown**: Same size; lists personal saved presets; includes "Reset to default".
-- **Sources button**: 48pt label; toggles side sheet; shows tooltip "Filenames and dates only.".
+- **Print (Large Text)**: 48pt button (Alt+P) invoking large-print flow; tooltip "Print in large text"; `aria-label="Print large-text view"`; hidden from tab order when `@media print` active.
+- **Export PDF**: 48pt button (Alt+E) launching offline export routine; tooltip "Creates a local PDF; may fall back to browser Print to PDF."; `aria-label="Creates a local PDF; may fall back to browser Print to PDF."`; if PDF engine unavailable, disable with helper text and surface fallback toast.
+- **Sources**: 48pt label; toggles side sheet; shows tooltip "Filenames and dates only.".
 - **Set Data Folder / Ingest / Hotswap**: Mirror flows from large-text app; `Alt+I` and `Alt+H` shortcuts active.
 - **Security slider**: 48pt segmented control; `aria-describedby` describing modes; blocks slider in Paranoid if adapters detected.
 - **Voice toggle**: OFF by default; 48pt pill button; if ON, announces "Voice Mode enabled. Hold space to speak." once.
@@ -41,6 +42,8 @@
 ## Keyboard Shortcuts
 - `Alt+N`: New thread (focus composer, create untitled entry; announces "New thread created." via `aria-live`).
 - `Alt+F`: Focus search box in threads list.
+- `Alt+P`: Trigger large-text print flow.
+- `Alt+E`: Launch Export PDF dialog.
 - `Delete`: Archive selected thread (shows 3-second undo toast).
 - `Alt+1`: Apply System preset slot 1; `Alt+2` slot 2; `Alt+3` slot 3 (announced via `aria-live`).
 - `Esc`: Cancels modals or destructive confirmations; 3-second grace message.
@@ -54,8 +57,26 @@
 ## Enhanced Visual Mode Behavior
 - Toggle sets full-screen overlay with 60pt threads list titles, 72pt composer text area, and expanded spacing.
 - CLI button hidden; `aria-hidden="true"` and removed from tab order.
+- Print and Export buttons remain visible; labels remind "Large text applies to print preview" while export keeps 48pt control size.
 - Toolbar shows banner "Enhanced Visual mode on." for 3 seconds (`aria-live`).
 - Voice remains OFF by default; Voice toggle still available.
+
+- **Print (Large Text)**: Uses `@media print` styles in `apps/webui/static/style.css` to output 60–72pt equivalents, hide toolbars/sidebars, and surface `.print-header` plus `.print-meta` badges (client, source, time). Invokes browser print dialog via `window.print()`.
+- **Export PDF**: Generates a standard-print layout with local HTML template (no external assets). Document structure:
+  - Header row: Thread title (bold), current timestamp, client/source badges.
+  - Messages: Block per turn showing role, timestamp, and message text (48pt Standard, 60pt Enhanced). Code/text uses monospace fallback bundled locally.
+  - Sources appendix: List of filenames + dates only.
+- All icons delivered as bundled SVGs under `apps/webui/static/icons/` (48px minimum), referenced via relative paths to satisfy CSP requirements.
+
+## Print & PDF Flows
+- **Print (Large Text)**:
+  - Button opens `/_print/{thread_id}` in a same-window modal view containing large-text HTML (no external assets, local fonts only).
+  - Browser immediately receives `window.print()` call to launch the native print dialog; `aria-live` announces "Print preview opened."
+  - When `@media print` is active, toolbars and nonessential chrome hide automatically; focus returns to Print button after dialog closes.
+- **Export PDF**:
+  - Button requests `/export/pdf/{thread_id}`; if local PDF engine is available, downloads PDF directly.
+  - If the engine is unavailable, UI shows toast `role="alert"` "PDF engine missing. Use Print to PDF instead." and button remains enabled for retry after engine installation.
+  - Completion toast `role="status"` announces "PDF saved locally." with focus moving to the downloads affordance.
 
 ## Accessibility Notes
 - All interactive elements maintain ≥7:1 contrast.

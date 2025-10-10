@@ -1,0 +1,19 @@
+{
+  "id": "thr-demo",
+  "title": "Demo Thread",
+  "client_slug": "client-a",
+  "source_slug": "source-xyz",
+  "source_path": "Samples/Client_A",
+  "created_at": 0,
+  "updated_at": 0,
+  "archived": false,
+  "messages": [
+    {
+      "role": "user",
+      "text": "Hello world",
+      "ts": 0,
+      "citations": [],
+      "meta": {}
+    }
+  ]
+}

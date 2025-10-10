@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Thread PDF</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    <style>
+        body {
+            background: #fff;
+            color: #000;
+            font-family: "Segoe UI", Arial, sans-serif;
+            font-size: 12pt;
+            line-height: 1.6;
+        }
+        h1 {
+            font-size: 20pt;
+            margin-bottom: 0.5rem;
+        }
+        .meta {
+            font-size: 12pt;
+            margin-bottom: 1rem;
+        }
+        .messages {
+            list-style: none;
+            padding: 0;
+        }
+        .message {
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+        .message header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10pt;
+            color: #333;
+        }
+        .message pre {
+            white-space: pre-wrap;
+            font-size: 12pt;
+            margin-top: 0.5rem;
+        }
+        .citations {
+            margin-top: 0.5rem;
+            font-size: 10pt;
+            color: #444;
+        }
+    </style>
+</head>
+<body>
+    <h1>Thread: {{ thread['title'] or 'Untitled' }}</h1>
+    <div class="meta">
+        <div>Thread ID: {{ thread['id'] }}</div>
+        <div>Client: {{ thread.get('client_slug') or 'default' }}</div>
+        <div>Source: {{ thread.get('source_slug') or 'n/a' }}</div>
+        <div>Updated: {{ thread.get('updated_at') }}</div>
+    </div>
+    <ol class="messages">
+        {% for message in thread.get('messages', []) %}
+        <li class="message">
+            <header>
+                <span>{{ message['role'].title() }}</span>
+                <span>{{ message['ts'] }}</span>
+            </header>
+            <pre>{{ message.get('text') or '' }}</pre>
+            {% if message.get('citations') %}
+            <div class="citations">
+                {% for cite in message['citations'] %}
+                <div>{{ cite.get('file') }} — {{ cite.get('date') }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ol>
+</body>
+</html>

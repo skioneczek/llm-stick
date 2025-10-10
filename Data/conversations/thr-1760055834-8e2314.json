@@ -1,0 +1,37 @@
+{
+  "id": "thr-1760055834-8e2314",
+  "title": "Smoke 5",
+  "created_at": 1760055834,
+  "updated_at": 1760055847,
+  "client_slug": null,
+  "source_slug": "Samples",
+  "source_path": null,
+  "messages": [
+    {
+      "role": "user",
+      "text": "Summarize Client A for me",
+      "ts": 1760055847,
+      "citations": [],
+      "meta": {}
+    },
+    {
+      "role": "assistant",
+      "text": "Plan: review retrieved chunks for \"Summarize Client A for me\" and surface key takeaways.\n- crut charitable remainder unitrust that pays a percentage to noncharitable beneficiaries with the remainder to charity grat grantor retained annuity trust that returns an annuity to the grantor for a term remainder to beneficiaries fmv fair market value the price \u2026\n- purpose and overview this illustrative family trust is designed to steward multi asset wealth for two generations while preserving flexibility for changing circumstances it is a neutral sample set for testing an offline ai workflow not advice the trust aims \u2026\nAsk \"Sources?\" for file names and dates.",
+      "ts": 1760055847,
+      "citations": [
+        {
+          "file": "Glossary.md",
+          "date": "2025-10-08"
+        },
+        {
+          "file": "Trust_Structure_Overview.txt",
+          "date": "2025-10-08"
+        }
+      ],
+      "meta": {
+        "plan": "Plan: review retrieved chunks for \"Summarize Client A for me\" and surface key takeaways."
+      }
+    }
+  ],
+  "archived": false
+}

@@ -160,18 +160,24 @@ def append_message(
 
 
 def search(
-    query: str,
+    query: Optional[str] = None,
     *,
     include_archived: bool = False,
     limit: int = 20,
 ) -> List[Dict[str, Any]]:
-    query_lc = query.strip().lower()
+    query_lc = (query or "").strip().lower()
+
+    threads = list_threads(include_archived=include_archived)
     if not query_lc:
-        return []
+        if limit and limit > 0:
+            return threads[:limit]
+        return threads
+
+    max_results = limit if limit and limit > 0 else None
 
     matches: List[Dict[str, Any]] = []
-    for meta in list_threads(include_archived=include_archived):
-        if len(matches) >= limit:
+    for meta in threads:
+        if max_results is not None and len(matches) >= max_results:
             break
         title = meta.get("title", "")
         if query_lc in title.lower():
@@ -188,6 +194,6 @@ def search(
                 break
         if snippet:
             matches.append({**meta, "snippet": snippet})
-            if len(matches) >= limit:
+            if max_results is not None and len(matches) >= max_results:
                 break
     return matches

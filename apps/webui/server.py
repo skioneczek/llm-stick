@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import os
+import shutil
 import socket
+import subprocess
+import tempfile
 from http import HTTPStatus
 from pathlib import Path
 from typing import Dict, Optional, Tuple
@@ -23,11 +27,39 @@ from services.security.http_guard import apply_secure_headers
 from services.threads import store as thread_store
 from services.ingest import registry as ingest_registry
 
+try:  # optional PDF engine (offline bundle)
+    from weasyprint import HTML as _WeasyHTML  # type: ignore
+except Exception:  # pragma: no cover - optional dependency
+    _WeasyHTML = None
+
 
 APP_ROOT = Path(__file__).resolve().parent
 STATIC_DIR = APP_ROOT / "static"
 TEMPLATE_DIR = APP_ROOT / "templates"
+TMP_DIR = Path("Data/tmp/webui")
+TMP_DIR.mkdir(parents=True, exist_ok=True)
+
 AUDIT_LOOPBACK_READY = "UI server bound to 127.0.0.1 with CSP applied."
+AUDIT_PRINT_LOCAL = "Print invoked (local assets only)."
+
+PDF_ENGINE_SETTING = os.environ.get("PDF_ENGINE", "").strip().lower()
+WKHTML_BIN = os.environ.get("WKHTMLTOPDF_BIN") or shutil.which("wkhtmltopdf")
+PDF_ENGINE_NAME: Optional[str]
+if PDF_ENGINE_SETTING == "wkhtml" and WKHTML_BIN:
+    PDF_ENGINE_NAME = "wkhtml"
+elif PDF_ENGINE_SETTING == "weasy" and _WeasyHTML is not None:
+    PDF_ENGINE_NAME = "weasy"
+else:
+    PDF_ENGINE_NAME = None
+
+if PDF_ENGINE_NAME == "weasy":
+    AUDIT_PDF_ENGINE = "PDF export (engine weasyprint)"
+elif PDF_ENGINE_NAME == "wkhtml":
+    AUDIT_PDF_ENGINE = "PDF export (engine wkhtml)"
+else:
+    AUDIT_PDF_ENGINE = None
+
+AUDIT_PDF_FALLBACK = "PDF export fallback (engine missing)"
 
 app = flask.Flask(
     __name__,
@@ -135,6 +167,80 @@ def append_message(thread_id: str) -> flask.Response:
     return flask.jsonify({"thread": updated})
 
 
+def _render_thread_html(thread: Dict[str, object], *, font: str = "large") -> str:
+    return flask.render_template("print_thread.html", thread=thread, font=font)
+
+
+def _generate_pdf_payload(html: str) -> tuple[Optional[bytes], Optional[str]]:
+    if PDF_ENGINE_NAME == "weasy" and _WeasyHTML is not None:
+        pdf = _WeasyHTML(string=html, base_url=str(STATIC_DIR)).write_pdf()  # type: ignore[arg-type]
+        return pdf, AUDIT_PDF_ENGINE
+    if PDF_ENGINE_NAME == "wkhtml" and WKHTML_BIN:
+        with tempfile.TemporaryDirectory(prefix="webui-", dir=TMP_DIR) as tmpdir:
+            html_path = Path(tmpdir) / "thread.html"
+            pdf_path = Path(tmpdir) / "thread.pdf"
+            html_path.write_text(html, encoding="utf-8")
+            cmd = [WKHTML_BIN, "--quiet", str(html_path), str(pdf_path)]
+            try:
+                subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except (subprocess.CalledProcessError, OSError):
+                return None, None
+            return pdf_path.read_bytes(), AUDIT_PDF_ENGINE
+    return None, None
+
+
+@app.route("/print/<thread_id>")
+@app.route("/_print/<thread_id>")
+def print_thread(thread_id: str):
+    thread = thread_store.get_thread(thread_id)
+    if not thread:
+        return flask.jsonify({"error": "Thread not found"}), HTTPStatus.NOT_FOUND
+    html = _render_thread_html(thread, font="large")
+    response = flask.make_response(html)
+    response.headers["Content-Type"] = "text/html; charset=utf-8"
+    response.headers["X-Action-Audit"] = AUDIT_PRINT_LOCAL
+    return response
+
+
+@app.route("/export/pdf/<thread_id>")
+@app.route("/threads/<thread_id>/pdf")
+def export_pdf(thread_id: str):
+    thread = thread_store.get_thread(thread_id)
+    if not thread:
+        return flask.jsonify({"error": "Thread not found"}), HTTPStatus.NOT_FOUND
+
+    # inside your /export/pdf/<thread_id> route handler
+    from apps.webui import pdf_engine
+    html = render_thread_html(thread_id, {"font": "standard"})  # you already have this
+    pdf_bytes, audit_hdr, audit_detail = pdf_engine.render_pdf_bytes(html)
+    if pdf_bytes:
+        resp = app.response_class(pdf_bytes, mimetype="application/pdf")
+        resp.headers["Content-Disposition"] = f'attachment; filename="thread-{thread_id}.pdf"'
+    else:
+        # JSON fallback for UI toast
+        resp = app.response_class('{"fallback":"print-to-pdf"}', mimetype="application/json")
+    # audits
+    resp.headers["X-Action-Audit"] = audit_hdr
+    resp.headers["X-Engine-Detail"] = audit_detail
+    return apply_secure_headers(resp)
+
+    pdf_bytes, audit = _generate_pdf_payload(html)
+
+    if pdf_bytes and audit:
+        response = flask.Response(pdf_bytes, mimetype="application/pdf")
+        response.headers["Content-Disposition"] = f'attachment; filename="thread-{thread_id}.pdf"'
+        response.headers["X-Action-Audit"] = audit
+        return response
+
+    fallback = flask.jsonify({
+        "fallback": "print-to-pdf",
+        "engine": PDF_ENGINE_NAME or "none",
+        "audit": AUDIT_PDF_FALLBACK,
+    })
+    fallback.headers["X-Action-Audit"] = AUDIT_PDF_FALLBACK
+    return fallback
+
+
 @app.route("/threads/<thread_id>/archive", methods=["POST"])
 def archive_thread(thread_id: str) -> flask.Response:
     data: Dict[str, object] = flask.request.get_json(force=False, silent=True) or {}
@@ -228,10 +334,19 @@ def _bind_loopback(port: int = 0) -> Tuple[str, int]:
     return addr, bound_port
 
 
+def _write_ready_file(path: str, url: str) -> None:
+    dir_path = os.path.dirname(path)
+    if dir_path:
+        os.makedirs(dir_path, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(url)
+
+
 def main(argv: Optional[list[str]] = None) -> None:
     parser = argparse.ArgumentParser(description="Loopback web UI server")
     parser.add_argument("--port", type=int, default=0, help="Port to bind (0 for random)")
     parser.add_argument("--view", choices=["standard", "enhanced"], default="standard")
+    parser.add_argument("--ready-file", default=None)
     args = parser.parse_args(argv)
 
     addr, port = _bind_loopback(args.port)
@@ -239,7 +354,13 @@ def main(argv: Optional[list[str]] = None) -> None:
     if not ok:
         print(audit)
         raise SystemExit(1)
-    print(f"{AUDIT_LOOPBACK_READY} http://{addr}:{port}")
+
+    url = f"http://{addr}:{port}"
+    print(f"UI: {url} (view={args.view})", flush=True)
+    print(f"{AUDIT_LOOPBACK_READY} {url}")
+
+    if args.ready_file:
+        _write_ready_file(args.ready_file, url)
 
     app.config["VIEW_MODE"] = args.view
     app.run(host=addr, port=port, debug=False, use_reloader=False)

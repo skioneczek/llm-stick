@@ -12,7 +12,8 @@
    - Right: Help icon (48pt) and close button (60pt) with redundant text labels.
 
 2. **Toolbar** (under title bar)
-   - 60pt controls in order: System Preset | User Preset | Sources | Set Data Folder | Ingest | Hotswap | Security slider | Voice | Panic | Enhanced Visual toggle.
+   - 60pt controls in order: System Preset | User Preset | Print (Large Text) | Export PDF | Sources | Set Data Folder | Ingest | Hotswap | Security slider | Voice | Panic | Enhanced Visual toggle.
+   - Print button shows tooltip "Print in large text" and uses shortcut Alt+P; Export uses Alt+E with helper "Creates a standard-print PDF for sharing. All local.".
    - CLI button (`Open CLI`) visible only in Standard view; in Enhanced Visual mode it is hidden, `aria-hidden="true"`, and removed from tab order.
    - Enhanced Visual toggle announcement: `aria-live="polite"` message "Enhanced Visual mode on." for 3 seconds when enabled.
 
@@ -39,6 +40,8 @@
 - `Alt+F`: Focus answer canvas (for screen reader review).
 - `Alt+N`: Start new thread and focus composer (`aria-live` "New thread created.").
 - `Alt+F` (threads view): Focus search field in threads list; announce "Search threads" via `aria-live`.
+- `Alt+P`: Trigger Print (Large Text) button.
+- `Alt+E`: Trigger Export PDF button.
 - `Alt+1/2/3`: Apply preset slots with polite announcement (e.g., "System preset 1 applied.").
 - `Delete`: Archive highlighted thread; shows 3-second undo toast.
 - `Esc`: Cancel modals (3-second grace message "Press Esc again within 3 seconds to confirm.").

@@ -87,40 +87,66 @@ def _read_json(environ) -> dict[str, object] | None:
         return {}
     try:
         return json.loads(body.decode("utf-8"))
-    except Exception:
+    except json.JSONDecodeError:
         return None
 
-def _json_response(payload: dict[str, object], *, status_code: int = 200, extra_headers: list[tuple[str, str]] | None = None):
+
+def _json_response(
+    payload: dict[str, object],
+    *,
+    status_code: int = 200,
+    extra_headers: list[tuple[str, str]] | None = None,
+):
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     headers: list[tuple[str, str]] = [
         ("Content-Type", "application/json; charset=utf-8"),
         ("Cache-Control", "no-store"),
+        ("Content-Length", str(len(body))),
     ]
     if extra_headers:
         headers.extend(extra_headers)
     status_line = f"{status_code} {HTTPStatus(status_code).phrase}"
     return status_line, _with_sec(headers), body
 
-def _ok_json(payload: dict[str, object], extra_headers: list[tuple[str,str]] | None = None):
+
+def _ok_json(payload: dict[str, object], extra_headers: list[tuple[str, str]] | None = None):
     return _json_response(payload, status_code=200, extra_headers=extra_headers)
+
 
 def _error_json(code: int, message: str):
     return _json_response({"error": message}, status_code=code)
 
-def _ok_html(html: str, extra_headers: list[tuple[str,str]] | None = None):
+
+def _ok_html(html: str, extra_headers: list[tuple[str, str]] | None = None):
     body = html.encode("utf-8")
-    headers = [("Content-Type", "text/html; charset=utf-8"), ("Cache-Control", "no-store")]
+    headers = [
+        ("Content-Type", "text/html; charset=utf-8"),
+        ("Cache-Control", "no-store"),
+    ]
     if extra_headers:
         headers.extend(extra_headers)
     return "200 OK", _with_sec(headers), body
 
+
 def _no_content():
     return "204 No Content", _with_sec([( "Cache-Control", "no-store")]), b""
 
+
+def _respond_json(
+    start_response,
+    status_code: int,
+    payload: dict[str, object],
+    extra_headers: list[tuple[str, str]] | None = None,
+):
+    status, headers, body = _json_response(payload, status_code=status_code, extra_headers=extra_headers)
+    start_response(status, headers)
+    return [body]
+
+
 def app(environ, start_response):
     method = environ["REQUEST_METHOD"]
-    path   = (environ.get("PATH_INFO") or "/").rstrip("/") or "/"
-    qs     = parse_qs(environ.get("QUERY_STRING",""))
+    path = (environ.get("PATH_INFO") or "/").rstrip("/") or "/"
+    qs = parse_qs(environ.get("QUERY_STRING", ""))
 
     try:
         # health & favicon
@@ -196,29 +222,24 @@ def app(environ, start_response):
         if method=="POST" and path.startswith("/threads/") and path.endswith("/messages"):
             parts = path.strip("/").split("/")
             if len(parts) != 3:
-                status, headers, body = _error_json(404, "not found")
-                start_response(status, headers); return [body]
+                return _respond_json(start_response, 404, {"error": "not found"})
 
             tid = parts[1]
             payload = _read_json(environ)
             if payload is None:
-                status, headers, body = _error_json(400, "invalid json")
-                start_response(status, headers); return [body]
+                return _respond_json(start_response, 400, {"error": "invalid json"})
 
             text = (payload.get("text") or payload.get("prompt") or "").strip()
             if not text:
-                status, headers, body = _error_json(400, "missing 'text'")
-                start_response(status, headers); return [body]
+                return _respond_json(start_response, 400, {"error": "empty prompt"})
 
             thread = store.get_thread(tid)
             if not thread:
-                status, headers, body = _error_json(404, "thread not found")
-                start_response(status, headers); return [body]
+                return _respond_json(start_response, 404, {"error": "thread not found"})
 
             user_msg = store.append_message(tid, "user", text, [])
             if user_msg is None:
-                status, headers, body = _error_json(500, "failed to append message")
-                start_response(status, headers); return [body]
+                return _respond_json(start_response, 500, {"error": "failed to append message"})
 
             client_slug = thread.get("client_slug") if isinstance(thread, dict) else None
             source_path = thread.get("source_path") if isinstance(thread, dict) else None
@@ -241,11 +262,12 @@ def app(environ, start_response):
                 meta={"plan": plan},
             )
             if assistant_msg is None:
-                status, headers, body = _error_json(500, "failed to append assistant message")
-                start_response(status, headers); return [body]
+                return _respond_json(start_response, 500, {"error": "failed to append assistant message"})
 
             updated = store.get_thread(tid)
-            status, headers, body = _ok_json(
+            return _respond_json(
+                start_response,
+                200,
                 {
                     "thread": updated,
                     "reply": {
@@ -254,9 +276,8 @@ def app(environ, start_response):
                         "bullets": bullets,
                     },
                     "sources": citations,
-                }
+                },
             )
-            start_response(status, headers); return [body]
 
         # archive
         if method=="POST" and path.startswith("/threads/") and path.endswith("/archive"):
@@ -298,12 +319,15 @@ def app(environ, start_response):
                 ]
                 start_response("200 OK", _with_sec(headers))
                 return [pdf_bytes]
-            payload = {"fallback":"print-to-pdf"}
-            status, headers, body = _ok_json(payload, [
-                ("X-Action-Audit", audit_hdr),
-                ("X-Engine-Detail", audit_detail),
-            ])
-            start_response(status, headers); return [body]
+            return _respond_json(
+                start_response,
+                200,
+                {"fallback": "print-to-pdf", "thread_id": tid},
+                extra_headers=[
+                    ("X-Action-Audit", audit_hdr),
+                    ("X-Engine-Detail", audit_detail),
+                ],
+            )
 
         # 404
         start_response("404 Not Found", _with_sec([( "Content-Type","text/plain")]))

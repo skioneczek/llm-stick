@@ -1,0 +1,44 @@
+{
+  "id": "thr-1760049852-a2871f",
+  "title": "Smoke test 2",
+  "created_at": 1760049852,
+  "updated_at": 1760049890,
+  "client_slug": "",
+  "source_slug": null,
+  "source_path": null,
+  "messages": [
+    {
+      "role": "user",
+      "text": "Hello?",
+      "ts": 1760049876,
+      "citations": [],
+      "meta": {}
+    },
+    {
+      "role": "assistant",
+      "text": "Plan: review archives for \"Hello?\" and ingest missing documents before answering.",
+      "ts": 1760049876,
+      "citations": [],
+      "meta": {
+        "plan": "Plan: review archives for \"Hello?\" and ingest missing documents before answering."
+      }
+    },
+    {
+      "role": "user",
+      "text": "Tell me about Client A",
+      "ts": 1760049890,
+      "citations": [],
+      "meta": {}
+    },
+    {
+      "role": "assistant",
+      "text": "Plan: review archives for \"Tell me about Client A\" and ingest missing documents before answering.",
+      "ts": 1760049890,
+      "citations": [],
+      "meta": {
+        "plan": "Plan: review archives for \"Tell me about Client A\" and ingest missing documents before answering."
+      }
+    }
+  ],
+  "archived": false
+}

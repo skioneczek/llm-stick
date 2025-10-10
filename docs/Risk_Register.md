@@ -40,3 +40,18 @@
   - Owner: Security Lead
   - Mitigation: Allowlist 127.0.0.1 only, ship strict CSP with bundled assets, deny external fonts/CDNs, and disable the UI server entirely in Paranoid mode with fallback UI.
   - Status: Open
+- **R-006 PDF engine unavailable offline**
+  - Severity: Medium
+  - Owner: Designer
+  - Mitigation: Treat wkhtmltopdf/WeasyPrint as optional modules, keep browser Print-to-PDF fallback acceptable for Day-2 acceptance, and vendor/sign offline engine on Day-3 with SHA capture before enabling default PDF export.
+  - Status: Open
+- **R-008 Export fallback coverage gaps**
+  - Severity: Medium
+  - Owner: Platform Lead
+  - Mitigation: Document fallback limitations (no embedded assets), add regression checks to ensure large-print styling persists, and upgrade to bundled engine once Day-3 packaging completes.
+  - Status: Open
+- **R-007 Thread store growth exceeds device limits**
+  - Severity: Medium
+  - Owner: Platform Lead
+  - Mitigation: Archive or rotate threads beyond threshold, run periodic compaction job, and surface storage alerts in audit log.
+  - Status: Open

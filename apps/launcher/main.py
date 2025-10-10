@@ -9,6 +9,7 @@ import threading
 import webbrowser
 import atexit
 import re
+import importlib.util
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
@@ -20,6 +21,7 @@ from services.preflight.host_alias import bind_host_path
 from services.preflight.adapter_detect import adapters_active
 from services.preflight.audit import audit_voice  # reuse the existing voice audit line
 from services.retriever import query as retriever
+from services.retriever import serve as rag
 from services.indexer import build_index as index_builder
 from services.indexer.source import (
     get_current_source,
@@ -94,15 +96,24 @@ def _voice_single_turn(args, prompt: str | None = None, *, mode: Mode | None = N
             tts_stub.speak("Index missing.")
             return
 
-        index = retriever.load_index(index_path)
-        hits = retriever.top_hits(index, utterance, k=8)
-        answer, cites = retriever.extractive_answer(utterance, hits)
-        print(answer)
-        if cites:
-            print()
-        retriever._print_sources(cites)
+        result = rag.answer(
+            utterance,
+            client_slug=getattr(args, "use_client", None),
+            index_path=str(index_path),
+        ) or {}
+        answer_text = str(result.get("answer_text") or result.get("summary") or "").strip()
+        citations = result.get("sources") or []
 
-        first_line = answer.splitlines()[0] if answer else "No answer available."
+        if answer_text:
+            print(answer_text)
+        else:
+            print("No answer available.")
+
+        if citations:
+            print()
+            retriever._print_sources(citations)
+
+        first_line = answer_text.splitlines()[0] if answer_text else "No answer available."
         tts_stub.speak(first_line)
     finally:
         if decrypted_path:
@@ -280,35 +291,80 @@ def _drain_process_output(proc: subprocess.Popen[str], prefix: str = "[webui]") 
     threading.Thread(target=_pump, name="webui-stdout", daemon=True).start()
 
 
+def _select_ui_module() -> str:
+    spec = importlib.util.find_spec("flask")
+    if spec is None:
+        return "apps.webui.server_stdlib"
+    return "apps.webui.server"
+
+
 def _launch_ui_server(view: str) -> Tuple[subprocess.Popen[str], str]:
-    cmd = [sys.executable, "-m", "apps.webui.server", "--view", view]
+    ready_file = Path("Data/ui/ready.txt")
+    ready_file.parent.mkdir(parents=True, exist_ok=True)
+    if ready_file.exists():
+        try:
+            ready_file.unlink()
+        except OSError:
+            pass
+
+    module_name = _select_ui_module()
+
+    env = os.environ.copy()
+    env["PYTHONUNBUFFERED"] = "1"
+
+    cmd = [
+        sys.executable,
+        "-m",
+        module_name,
+        "--view",
+        view,
+        "--port",
+        "0",
+        "--ready-file",
+        str(ready_file),
+    ]
     proc = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
         bufsize=1,
+        env=env,
     )
 
-    url = "http://127.0.0.1"
-    if proc.stdout:
-        while True:
+    url: Optional[str] = None
+    for _ in range(120):
+        if ready_file.exists() and ready_file.stat().st_size > 0:
+            try:
+                url = ready_file.read_text(encoding="utf-8").strip()
+                if url:
+                    break
+            except OSError:
+                pass
+        time.sleep(0.1)
+
+    if not url and proc.stdout:
+        for _ in range(50):
             line = proc.stdout.readline()
             if not line:
-                break
+                time.sleep(0.1)
+                continue
             stripped = line.rstrip()
             print(f"[webui] {stripped}")
-            match = _URL_RE.search(stripped)
-            if match:
-                url = match.group(1)
+            if stripped.startswith("UI: "):
+                url = stripped.split("UI: ", 1)[1].strip().split(" ", 1)[0]
                 break
-        if proc.poll() is not None and proc.returncode not in (0, None):
-            raise RuntimeError("Web UI server exited during startup.")
+
+    if proc.stdout:
         _drain_process_output(proc)
 
+    if not url:
+        if proc.poll() is not None and proc.returncode not in (0, None):
+            raise RuntimeError(f"Web UI server exited during startup with code {proc.returncode}.")
+        else:
+            raise RuntimeError("UI server did not report a ready URL in time.")
+
     return proc, url
-
-
 def _register_ui_cleanup(proc: subprocess.Popen[str]) -> None:
     def _cleanup() -> None:
         if proc.poll() is None:

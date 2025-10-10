@@ -53,6 +53,11 @@ def list_client(
         results = [e for e in results if e.get("client_slug") == client_slug]
     return results
 
+
+def list_memory(thread_id: str) -> List[Dict]:
+    d = _load()
+    return [e for e in d["entries"] if e.get("thread_id") == thread_id]
+
 def prune(
     client: str,
     key: str,

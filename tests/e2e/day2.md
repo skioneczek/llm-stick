@@ -20,13 +20,60 @@ python - <<'PY'
 from services.security import net_guard, http_guard
 
 ok, audit = net_guard.allow_loopback_only()
-print(ok, audit)
+assert ok is True, ok
+assert audit == "Loopback allowed (UI server only).", audit
 net_guard.clear_guards()
-print(net_guard.audit_ui_server_disabled())
+
+paranoid_audit = net_guard.audit_ui_server_disabled()
+assert paranoid_audit == "UI server disabled in Paranoid mode.", paranoid_audit
+print(paranoid_audit)
 
 headers, csp_audit = http_guard.apply_secure_headers({})
-print(headers["Content-Security-Policy"])
+expected_csp = (
+    "default-src 'none';"
+    " style-src 'self';"
+    " script-src 'self';"
+    " img-src 'self';"
+    " connect-src 'self';"
+    " font-src 'self';"
+    " object-src 'none';"
+    " base-uri 'none';"
+    " form-action 'self';"
+    " frame-ancestors 'none'"
+)
+assert headers["Content-Security-Policy"] == expected_csp, headers["Content-Security-Policy"]
+assert headers["Permissions-Policy"] == "*=(\"\")"
+assert csp_audit == "CSP applied (offline assets only)."
+print("CSP header ok")
 print(csp_audit)
+PY
+```
+
+## Scenario 9 — Print and PDF Export Audits
+```powershell
+python - <<'PY'
+from apps.webui import server
+
+print(server.AUDIT_PRINT_LOCAL)
+print(server.AUDIT_PDF_ENGINE)
+print(server.AUDIT_PDF_FALLBACK)
+print("PDF engine available:", server.PDF_ENGINE_AVAILABLE)
+
+thread_stub = {
+    "id": "thr-demo",
+    "title": "Demo",
+    "client_slug": "client-a",
+    "source_slug": "samples-client-a",
+    "updated_at": 0,
+    "messages": [],
+}
+
+html = server._render_thread_for_pdf(thread_stub)
+payload = server._generate_pdf_payload(html)
+if payload:
+    print("PDF bytes:", len(payload))
+else:
+    print(server.AUDIT_PDF_FALLBACK)
 PY
 ```
 
