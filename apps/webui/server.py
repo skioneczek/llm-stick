@@ -481,11 +481,26 @@ def preset() -> flask.Response:
     return flask.jsonify({"message": message})
 
 
-@app.route("/sources")
-def sources() -> flask.Response:
+def _build_source_payload() -> Dict[str, str]:
     current = get_current_source()
     slug = slug_for_source(current)
-    return flask.jsonify({"source": str(current), "slug": slug})
+    resolved = str(current)
+    return {
+        "active_source": resolved,
+        "source": resolved,
+        "current_source": resolved,
+        "slug": slug,
+    }
+
+
+@app.route("/api/sources")
+def sources_api() -> flask.Response:
+    return flask.jsonify(_build_source_payload())
+
+
+@app.route("/sources")
+def sources() -> flask.Response:
+    return flask.jsonify(_build_source_payload())
 
 
 def _bind_loopback(port: int = 0) -> Tuple[str, int]:
