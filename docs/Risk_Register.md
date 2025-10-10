@@ -3,8 +3,8 @@
 - **Air-gap bypass via misconfigured adapters**
   - Severity: High
   - Owner: Security Lead
-  - Mitigation: Enforce adapter check in Paranoid; run self-check after slider changes.
-  - Status: Open
+  - Mitigation: Enforce adapter check in Paranoid; run self-check after slider changes. Launcher now blocks when checksum manifests are missing and reiterates guard guidance before launch.
+  - Status: Mitigated (2025-10-10)
 - **Voice Mode autostart regression**
   - Severity: Medium
   - Owner: Accessibility Lead
@@ -13,8 +13,8 @@
 - **Host write permissions leaking**
   - Severity: Medium
   - Owner: Systems Lead
-  - Mitigation: Restrict host access via `bind_host_path()` read-only alias; audit on enforcement.
-  - Status: Open
+  - Mitigation: Restrict host access via `bind_host_path()` read-only alias; audit on enforcement. Day-3 checksum enforcement keeps binaries immutable and wrapper logging captures runtime actions.
+  - Status: Monitoring
 - **R-001 Network guard false-positive on some OS builds**
   - Severity: Medium
   - Owner: Security Lead
@@ -23,33 +23,33 @@
 - **R-002 Dynamic source selection leaks or slows indexing**
   - Severity: Medium
   - Owner: Security Lead
-  - Mitigation: Constrain `Set Source` to approved read-only roots, require explicit user confirmation, warn if folder exceeds thresholds (e.g., >1,000 files or >2 GB), allow cancel, validate via `services/security/source_guard.validate_source()` audit, and instruct Data to rebuild indexes only after a successful audit while retaining prior index on failure.
-  - Status: Open
+  - Mitigation: Constrain `Set Source` to approved read-only roots, require explicit user confirmation, warn if folder exceeds thresholds (e.g., >1,000 files or >2 GB), allow cancel, validate via `services/security/source_guard.validate_source()` audit, and instruct Data to rebuild indexes only after a successful audit while retaining prior index on failure. Ingest worker now validates sources per job before chunking.
+  - Status: Mitigated (2025-10-10)
 - **R-003 OCR / crypto provider unavailable at ingest time**
   - Severity: Medium
   - Owner: Platform Lead
-  - Mitigation: Detect missing OCR/crypto binaries up front, log via audit surface, fall back to signed stubs, and keep ingest pipeline pluggable so providers can be hot-swapped without blocking HOST_LOCAL ingest.
-  - Status: Open
+  - Mitigation: Detect missing OCR/crypto binaries up front, log via audit surface, fall back to signed stubs, and keep ingest pipeline pluggable so providers can be hot-swapped without blocking HOST_LOCAL ingest. Worker records OCR availability and aborts encryption when providers are missing.
+  - Status: Mitigated (2025-10-10)
 - **R-004 Ingestion bleed mixes client corpora**
   - Severity: High
   - Owner: Data Lead
-  - Mitigation: Require per-client registry with unique source slug, only allow ingest from registered sources, enforce ledger/index tagging, and abort if paths fall outside the active client scope.
-  - Status: Open
+  - Mitigation: Require per-client registry with unique source slug, only allow ingest from registered sources, enforce ledger/index tagging, and abort if paths fall outside the active client scope. Registry now records manifest paths + job IDs for audit.
+  - Status: Mitigated (2025-10-10)
 - **R-005 Web UI loopback allowance expands socket surface**
   - Severity: Medium
   - Owner: Security Lead
-  - Mitigation: Allowlist 127.0.0.1 only, ship strict CSP with bundled assets, deny external fonts/CDNs, and disable the UI server entirely in Paranoid mode with fallback UI.
-  - Status: Open
+  - Mitigation: Allowlist 127.0.0.1 only, ship strict CSP with bundled assets, deny external fonts/CDNs, and disable the UI server entirely in Paranoid mode with fallback UI. Streaming endpoint reuses the loopback-only guard and logs llama.cpp output to audit history.
+  - Status: Monitoring
 - **R-006 PDF engine unavailable offline**
   - Severity: Medium
   - Owner: Designer
   - Mitigation: Treat wkhtmltopdf/WeasyPrint as optional modules, keep browser Print-to-PDF fallback acceptable for Day-2 acceptance, and vendor/sign offline engine on Day-3 with SHA capture before enabling default PDF export.
-  - Status: Open
+  - Status: Monitoring
 - **R-008 Export fallback coverage gaps**
   - Severity: Medium
   - Owner: Platform Lead
-  - Mitigation: Document fallback limitations (no embedded assets), add regression checks to ensure large-print styling persists, and upgrade to bundled engine once Day-3 packaging completes.
-  - Status: Open
+  - Mitigation: Document fallback limitations (no embedded assets), add regression checks to ensure large-print styling persists, and upgrade to bundled engine once Day-3 packaging completes. Streaming UI logs print/export actions for audit.
+  - Status: Monitoring
 - **R-007 Thread store growth exceeds device limits**
   - Severity: Medium
   - Owner: Platform Lead

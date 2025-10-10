@@ -105,6 +105,17 @@ Expected: Messages match `apps/ui/voice_script.md`: `"Voice Mode enabled. Hold s
 ### Prompt/Answer Template Check
 Re-use Standard/Hardened launcher runs above to confirm answers follow `docs/prompt_templates.md` patterns (plan → answer → sources) and require explicit "Sources" request before speaking citations.
 
+## Scenario 5A — Ingest Registry Acceptance (Day 2.5)
+```powershell
+python -m apps.launcher.main --mode standard --pin 123456 --ingest Samples --client client-a --dest HOST_LOCAL
+```
+Expected: Launcher reports checksum verification before ingest starts, queues a job, and writes ledger entries noting chunk counts. `Data/ingest_jobs/job-*.json` shows `storage_mode` + OCR availability, and `Data/ingested_registry.json` records `manifest` + `job_id` for `client-a`.
+
+```powershell
+python -m apps.launcher.main --mode standard --pin 123456 --ingest Samples --client client-a --dest STICK_ENCRYPTED --confirm-set-source Samples
+```
+Expected: Source validation runs, HOST_LOCAL chunks are encrypted via configured provider, and ledger output includes the provider audit line. Registry updates `storage_mode` to `STICK_ENCRYPTED` with encrypted index path and manifest reference. Failure to load crypto provider aborts with a clear error.
+
 # Acceptance Script — Day 3 (2025-10-10)
 
 ## Preconditions

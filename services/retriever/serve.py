@@ -1,11 +1,10 @@
 from __future__ import annotations
 from pathlib import Path
 import datetime
-import subprocess
-import threading
 from collections import defaultdict
 from typing import Callable, Dict, Iterator, List, Optional, Tuple
 
+from core.llm import invoke as llm_invoke
 from core.llm import wrap as llm_wrap
 from services.indexer.build_index import chunk_text, iter_files, read_file
 from services.indexer.source import (
@@ -191,40 +190,17 @@ def _stream_llm(prompt_text: str, stream_callback: StreamCallback = None) -> str
     llm_wrap.verify_checksums(profile_name, [binary_path, model_path])
 
     command = llm_wrap.build_command(profile, binary_path, model_path, prompt_text)
-    process = subprocess.Popen(
+    result = llm_invoke.invoke(
         command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        bufsize=1,
+        prompt_text,
+        profile_name=profile_name,
+        stream_callback=stream_callback,
     )
 
-    if process.stdout is None or process.stderr is None:
-        raise RuntimeError("Failed to capture llama.cpp output streams.")
+    if result.returncode != 0:
+        raise RuntimeError(f"LLM process exited with status {result.returncode}")
 
-    def drain_stderr() -> None:
-        for _ in process.stderr:
-            pass
-
-    threading.Thread(target=drain_stderr, daemon=True).start()
-
-    collected: List[str] = []
-    for chunk in iter(lambda: process.stdout.read(1), ""):
-        if not chunk:
-            break
-        collected.append(chunk)
-        if stream_callback:
-            stream_callback(chunk)
-
-    return_code = process.wait()
-    if process.stdout:
-        process.stdout.close()
-    if process.stderr:
-        process.stderr.close()
-    if return_code != 0:
-        raise RuntimeError(f"LLM process exited with status {return_code}")
-
-    return "".join(collected).strip()
+    return result.stdout.strip()
 
 
 def _extract_plan_answer(output: str) -> Tuple[str, str]:

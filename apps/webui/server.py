@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import socket
 import subprocess
 import tempfile
+import threading
+import time
+import uuid
 from http import HTTPStatus
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, Iterable, Optional, Tuple
 
 try:
     import flask
@@ -101,6 +105,118 @@ def home() -> flask.Response:
     )
 
 
+_STREAMS: Dict[str, Dict[str, object]] = {}
+_STREAM_LOCK = threading.Lock()
+
+
+def _register_stream() -> str:
+    sid = uuid.uuid4().hex
+    with _STREAM_LOCK:
+        _STREAMS[sid] = {"q": [], "done": False, "error": None, "meta": {}}
+    return sid
+
+
+def _update_stream(sid: str, key: str, value: object) -> None:
+    with _STREAM_LOCK:
+        if sid in _STREAMS:
+            _STREAMS[sid][key] = value
+
+
+def _append_stream_token(sid: str, token: str) -> None:
+    with _STREAM_LOCK:
+        entry = _STREAMS.get(sid)
+        if entry is not None:
+            entry.setdefault("q", []).append(token)
+
+
+def _stream_response(sid: str) -> Iterable[str]:
+    index = 0
+    while True:
+        with _STREAM_LOCK:
+            state = dict(_STREAMS.get(sid) or {})
+        if not state:
+            yield "event: error\ndata: stream-missing\n\n"
+            break
+
+        queue = state.get("q", [])
+        while index < len(queue):
+            token = queue[index]
+            index += 1
+            yield f"data: {token}\n\n"
+
+        if state.get("error"):
+            yield f"event: error\ndata: {state['error']}\n\n"
+            break
+
+        if state.get("done"):
+            meta = state.get("meta") or {}
+            yield f"event: meta\ndata: {json.dumps(meta)}\n\n"
+            yield "event: end\ndata: end\n\n"
+            break
+
+        time.sleep(0.05)
+
+    with _STREAM_LOCK:
+        _STREAMS.pop(sid, None)
+
+
+def _launch_answer_thread(
+    sid: str,
+    thread: Dict[str, object],
+    prompt: str,
+    realtime: bool,
+    source_override: Optional[str],
+) -> None:
+    def _runner() -> None:
+        tokens: list[str] = []
+        try:
+            source_path = source_override or _thread_source_path(thread)
+
+            def on_token(token: str) -> None:
+                tokens.append(token)
+                _append_stream_token(sid, token)
+
+            result = retriever_service.answer_llm(
+                prompt,
+                source_path=source_path,
+                realtime=realtime,
+                stream_callback=on_token,
+            )
+
+            answer_text = result.get("answer") or "".join(tokens).strip()
+            plan_text = result.get("plan") or ""
+            citations = result.get("sources") or []
+
+            thread_store.append_message(
+                thread["id"],
+                role="assistant",
+                text=answer_text,
+                citations=citations,
+                meta={
+                    "plan": plan_text,
+                    "mode": result.get("mode"),
+                    "source_path": result.get("source_path"),
+                    "raw_output": result.get("raw_output"),
+                },
+            )
+
+            _update_stream(
+                sid,
+                "meta",
+                {
+                    "sources": citations,
+                    "plan": plan_text,
+                    "thread_id": thread.get("id"),
+                },
+            )
+            _update_stream(sid, "done", True)
+        except Exception as exc:  # pragma: no cover - background safety
+            _update_stream(sid, "error", str(exc))
+            _update_stream(sid, "done", True)
+
+    threading.Thread(target=_runner, daemon=True).start()
+
+
 @app.route("/threads", methods=["POST"])
 def create_thread() -> flask.Response:
     data: Dict[str, object] = flask.request.get_json(force=False, silent=True) or {}
@@ -143,28 +259,74 @@ def append_message(thread_id: str) -> flask.Response:
     client_slug = thread.get("client_slug")
     source_path = _thread_source_path(thread)
 
-    result = retriever_service.answer(
+    thread_store.append_message(thread_id, role="user", text=prompt)
+    result = retriever_service.answer_llm(
         prompt,
-        client_slug=str(client_slug) if isinstance(client_slug, str) else None,
         source_path=source_path,
+        realtime=bool(data.get("realtime")),
     )
 
-    thread_store.append_message(thread_id, role="user", text=prompt)
-
-    plan = result.get("plan") or "Plan: review archives and ingest missing documents before answering."
-    bullets = result.get("bullets") or []
-    response_lines = [plan] + [f"- {line}" for line in bullets]
+    answer_text = (
+        result.get("answer")
+        or result.get("answer_text")
+        or result.get("raw_output")
+        or ""
+    )
+    plan_text = result.get("plan") or ""
 
     thread_store.append_message(
         thread_id,
         role="assistant",
-        text="\n".join(response_lines).strip(),
+        text=answer_text,
         citations=result.get("sources"),
-        meta={"plan": plan},
+        meta={
+            "plan": plan_text,
+            "mode": result.get("mode"),
+            "source_path": result.get("source_path"),
+        },
     )
 
     updated = thread_store.get_thread(thread_id)
     return flask.jsonify({"thread": updated})
+
+
+@app.route("/api/ask", methods=["POST"])
+def ask_stream() -> flask.Response:
+    payload: Dict[str, object] = flask.request.get_json(force=False, silent=True) or {}
+    prompt = str(payload.get("prompt") or "").strip()
+    thread_id = str(payload.get("thread_id") or "").strip()
+    realtime = bool(payload.get("realtime"))
+    source_override = str(payload.get("source_path") or "").strip() or None
+    if not prompt:
+        return flask.jsonify({"error": "Prompt required"}), HTTPStatus.BAD_REQUEST
+    if not thread_id:
+        return flask.jsonify({"error": "thread_id required"}), HTTPStatus.BAD_REQUEST
+
+    thread = thread_store.get_thread(thread_id)
+    if not thread:
+        return flask.jsonify({"error": "Thread not found"}), HTTPStatus.NOT_FOUND
+
+    thread_store.append_message(
+        thread_id,
+        role="user",
+        text=prompt,
+        meta={"realtime": realtime, "source_path": source_override},
+    )
+
+    sid = _register_stream()
+    _launch_answer_thread(sid, thread, prompt, realtime, source_override)
+
+    response = {"sid": sid, "sse": f"/api/stream/{sid}"}
+    return flask.jsonify(response), HTTPStatus.ACCEPTED
+
+
+@app.route("/api/stream/<sid>", methods=["GET"])
+def stream_tokens(sid: str) -> flask.Response:
+    generator = flask.stream_with_context(_stream_response(sid))
+    response = flask.Response(generator, mimetype="text/event-stream")
+    response.headers["Cache-Control"] = "no-cache"
+    response.headers["X-Accel-Buffering"] = "no"
+    return response
 
 
 def _render_thread_html(thread: Dict[str, object], *, font: str = "large") -> str:
@@ -319,11 +481,26 @@ def preset() -> flask.Response:
     return flask.jsonify({"message": message})
 
 
-@app.route("/sources")
-def sources() -> flask.Response:
+def _build_source_payload() -> Dict[str, str]:
     current = get_current_source()
     slug = slug_for_source(current)
-    return flask.jsonify({"source": str(current), "slug": slug})
+    resolved = str(current)
+    return {
+        "active_source": resolved,
+        "source": resolved,
+        "current_source": resolved,
+        "slug": slug,
+    }
+
+
+@app.route("/api/sources")
+def sources_api() -> flask.Response:
+    return flask.jsonify(_build_source_payload())
+
+
+@app.route("/sources")
+def sources() -> flask.Response:
+    return flask.jsonify(_build_source_payload())
 
 
 def _bind_loopback(port: int = 0) -> Tuple[str, int]:
