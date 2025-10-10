@@ -2,7 +2,7 @@
   "id": "thr-1760048627-88ff24",
   "title": "Smoke test",
   "created_at": 1760048627,
-  "updated_at": 1760048716,
+  "updated_at": 1760115173,
   "client_slug": "default",
   "source_slug": null,
   "source_path": null,
@@ -43,5 +43,5 @@
       "meta": {}
     }
   ],
-  "archived": false
+  "archived": true
 }

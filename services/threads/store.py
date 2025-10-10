@@ -74,6 +74,17 @@ def list_threads(include_archived: bool = False) -> List[Dict[str, Any]]:
     return [t for t in threads if not t.get("archived")]
 
 
+def create_thread(
+    title: str,
+    client_slug: str,
+    source_slug: str,
+    *,
+    source_path: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Alias retained for compatibility with UI server naming."""
+    return new_thread(title, client_slug, source_slug, source_path=source_path)
+
+
 def new_thread(
     title: str,
     client_slug: str,

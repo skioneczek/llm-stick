@@ -2,7 +2,7 @@
   "id": "thr-1760051247-bfcacb",
   "title": "Smoke test 3",
   "created_at": 1760051247,
-  "updated_at": 1760052207,
+  "updated_at": 1760115175,
   "client_slug": "",
   "source_slug": null,
   "source_path": null,
@@ -56,5 +56,5 @@
       }
     }
   ],
-  "archived": false
+  "archived": true
 }

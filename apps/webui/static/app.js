@@ -5,6 +5,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const threadsEmpty = document.getElementById("threads-empty");
   let activeThreadId = null;
 
+  const safeToast = window.toast || ((msg) => log(msg));
+  const startAssistantBubble = window.startAssistantBubble || (() => {});
+  const appendAssistantTokens = window.appendAssistantTokens || (() => {});
+  const finishAssistantBubble = window.finishAssistantBubble || ((_text, sources) => {
+    if (sources && sources.length) {
+      log(`Sources available: ${sources.length}`);
+    }
+  });
+
   const log = (msg) => {
     const timestamp = new Date().toISOString();
     audit.textContent = `[${timestamp}] ${msg}\n` + audit.textContent;
@@ -120,6 +129,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await fetchJson("/api/sources");
       const banner = document.getElementById("sourceBanner") || sourceLabel;
       if (data && data.active_source) {
+        window.__currentSource = data.active_source;
         banner.textContent = `Source: ${data.active_source}`;
         const srcField = document.getElementById("newThreadSourcePath");
         if (srcField && !srcField.value) {
@@ -127,11 +137,13 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         log("Source info refreshed.");
       } else {
+        window.__currentSource = "";
         banner.textContent = "No active source — use Set Source controls.";
         log("Source info missing.");
       }
     } catch (err) {
       const banner = document.getElementById("sourceBanner") || sourceLabel;
+      window.__currentSource = "";
       banner.textContent = "Source lookup failed. Need CLI? Use launcher window.";
       log(`Source refresh failed: ${err.message}`);
     }
@@ -310,16 +322,10 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
         try {
-          await fetchJson(`/threads/${threadId}/messages`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt }),
-          });
-          log(`Message appended to ${threadId}`);
+          await ask(prompt);
           form.reset();
           textarea?.focus();
           activeThreadId = threadId;
-          await loadThreads();
           openThread(threadId, { scroll: false });
         } catch (err) {
           log(`Message failed: ${err.message}`);
@@ -462,6 +468,32 @@ document.addEventListener("DOMContentLoaded", () => {
       log(`Preset failed: ${err.message}`);
     }
   });
+
+  async function ask(prompt) {
+    const realtime = document.querySelector('#toggle-realtime')?.checked ?? false;
+    const source = window.__currentSource || "";
+    const res = await fetch('/api/ask', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ prompt, realtime, source_path: source })
+    });
+    const { sse } = await res.json();
+
+    const es = new EventSource(sse);
+    let buf = '';
+    startAssistantBubble();
+
+    es.onmessage = (ev) => {
+      appendAssistantTokens(ev.data);
+      buf += ev.data;
+    };
+    es.addEventListener('meta', (ev) => {
+      const meta = JSON.parse(ev.data || '{}');
+      finishAssistantBubble(buf, meta.sources || []);
+    });
+    es.addEventListener('end', () => es.close());
+    es.addEventListener('error', () => { safeToast('Stream error'); es.close(); });
+  }
 
   refreshSource();
   loadThreads();

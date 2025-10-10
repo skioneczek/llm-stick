@@ -7,8 +7,8 @@
       "source_slug": null,
       "source_path": null,
       "created_at": 1760048627,
-      "updated_at": 1760048716,
-      "archived": false
+      "updated_at": 1760115173,
+      "archived": true
     },
     {
       "id": "thr-1760049852-a2871f",
@@ -17,8 +17,8 @@
       "source_slug": null,
       "source_path": null,
       "created_at": 1760049852,
-      "updated_at": 1760049890,
-      "archived": false
+      "updated_at": 1760115174,
+      "archived": true
     },
     {
       "id": "thr-1760051247-bfcacb",
@@ -27,8 +27,8 @@
       "source_slug": null,
       "source_path": null,
       "created_at": 1760051247,
-      "updated_at": 1760052207,
-      "archived": false
+      "updated_at": 1760115175,
+      "archived": true
     },
     {
       "id": "thr-1760055804-48bfad",
@@ -37,8 +37,8 @@
       "source_slug": null,
       "source_path": null,
       "created_at": 1760055804,
-      "updated_at": 1760055804,
-      "archived": false
+      "updated_at": 1760115176,
+      "archived": true
     },
     {
       "id": "thr-1760055834-8e2314",
@@ -47,8 +47,8 @@
       "source_slug": "Samples",
       "source_path": null,
       "created_at": 1760055834,
-      "updated_at": 1760055847,
-      "archived": false
+      "updated_at": 1760115177,
+      "archived": true
     },
     {
       "id": "thr-1760056235-c602b7",
@@ -57,7 +57,17 @@
       "source_slug": "Samples",
       "source_path": null,
       "created_at": 1760056235,
-      "updated_at": 1760056241,
+      "updated_at": 1760115178,
+      "archived": true
+    },
+    {
+      "id": "thr-1760115347-965922",
+      "title": "Smoke (Day 3)",
+      "client_slug": "default",
+      "source_slug": "Samples",
+      "source_path": "",
+      "created_at": 1760115347,
+      "updated_at": 1760115347,
       "archived": false
     }
   ]

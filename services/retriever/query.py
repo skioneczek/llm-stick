@@ -7,6 +7,7 @@ from typing import List, Dict
 from services.indexer.source import get_current_source, index_path_for_source, slug_for_source
 from services.ingest.registry import get_client
 from services.memory.ledger import add as ledger_add
+from services.retriever import serve
 
 _ws = re.compile(r"\W+", re.U)
 def toks(s: str) -> List[str]:
@@ -80,6 +81,88 @@ def extractive_answer(query: str, hits: List[Dict]) -> Dict[str, object]:
         "bullets": bullets,
         "citations": cites,
         "answer_text": answer_text,
+    }
+
+
+def run_llm(
+    query: str,
+    *,
+    client: str | None = None,
+    remember: str | None = None,
+    use_client: str | None = None,
+    realtime: bool = False,
+    sources_only: bool = False,
+    stream: bool = True,
+    suppress_output: bool = False,
+):
+    stream_output: List[str] = []
+
+    def _stream(chunk: str):
+        stream_output.append(chunk)
+        if not suppress_output and stream:
+            print(chunk, end="", flush=True)
+
+    result = serve.answer_llm(
+        query,
+        source_slug=use_client,
+        realtime=realtime,
+        stream_callback=_stream if stream else None,
+    )
+
+    if not suppress_output and stream:
+        print()
+
+    plan = result.get("plan", "")
+    answer_text = result.get("answer", "")
+    if not stream and not suppress_output and not sources_only:
+        if plan:
+            print(f"Plan: {plan}")
+        if answer_text:
+            print(answer_text)
+
+    cites = result.get("sources", [])
+
+    if sources_only and not suppress_output:
+        _print_sources(cites)
+    elif not suppress_output:
+        if cites:
+            print()
+        _print_sources(cites)
+
+    memory_written = False
+    if client and remember:
+        if "=" not in remember:
+            if not suppress_output:
+                print("\n[Memory] Skipped: --remember must be in key=value format.")
+        else:
+            key, value = remember.split("=", 1)
+            ledger_add(
+                client.strip(),
+                key.strip(),
+                value.strip(),
+                source_slug=result.get("source_slug"),
+                client_slug=result.get("client_slug"),
+            )
+            memory_written = True
+            if not suppress_output:
+                print(
+                    f"\n[Memory] Stored '{key.strip()}' for {client.strip()} (source {result.get('source_slug')})."
+                )
+    elif client or remember:
+        if not suppress_output:
+            print("\n[Memory] Skipped: provide both --client and --remember to store a note.")
+
+    return {
+        "plan": plan,
+        "answer": answer_text,
+        "sources": cites,
+        "memory_written": memory_written,
+        "source_path": result.get("source_path"),
+        "source_slug": result.get("source_slug"),
+        "client_slug": result.get("client_slug"),
+        "mode": result.get("mode"),
+        "raw_output": result.get("raw_output"),
+        "streamed": stream_output,
     }
 
 def _print_sources(cites: List[Dict]):
@@ -215,6 +298,16 @@ if __name__ == "__main__":
         default=None,
         help="Use the ingest registry entry for the specified client slug",
     )
+    ap.add_argument(
+        "--llm",
+        action="store_true",
+        help="Generate answer using offline LLM with streaming output",
+    )
+    ap.add_argument(
+        "--realtime",
+        action="store_true",
+        help="Force on-the-fly retrieval without stored index",
+    )
     args = ap.parse_args()
 
     if args.show_active_source:
@@ -237,15 +330,33 @@ if __name__ == "__main__":
                 else index_path_for_source(current)
             )
             print(f"Active source: {current}")
-            print(f"Source slug: {slug}")
+            print(f"Slug: {slug}")
             print(f"Index file: {index_file}")
         raise SystemExit(0)
 
+    if args.llm:
+        run_llm(
+            args.q,
+            client=args.client,
+            remember=args.remember,
+            use_client=args.use_client,
+            realtime=args.realtime,
+            sources_only=args.sources_only,
+            stream=True,
+        )
+        raise SystemExit(0)
+
+    if args.realtime and not args.llm:
+        print("--realtime is only supported with --llm mode.")
+        raise SystemExit(2)
+
     run(
-        query=args.q,
+        args.q,
         index_path=args.index,
         sources_only=args.sources_only,
         client=args.client,
         remember=args.remember,
         use_client=args.use_client,
+        source_override=None,
+        suppress_output=False,
     )

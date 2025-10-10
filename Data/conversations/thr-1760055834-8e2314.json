@@ -2,7 +2,7 @@
   "id": "thr-1760055834-8e2314",
   "title": "Smoke 5",
   "created_at": 1760055834,
-  "updated_at": 1760055847,
+  "updated_at": 1760115177,
   "client_slug": null,
   "source_slug": "Samples",
   "source_path": null,
@@ -33,5 +33,5 @@
       }
     }
   ],
-  "archived": false
+  "archived": true
 }

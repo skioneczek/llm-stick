@@ -10,6 +10,7 @@ import threading
 import webbrowser
 import atexit
 import re
+import contextlib
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
@@ -58,6 +59,7 @@ LLM_MANIFEST_PATH = Path("packaging/checksums/manifest.json")
 _LLM_CHECK_CACHE: Optional[Tuple[bool, str, int]] = None
 LLM_ENABLED = True
 LLM_DISABLED_REASON: Optional[str] = None
+_CHECKSUM_ANNOUNCED = False
 
 
 def _checksum_digest(path: Path) -> str:
@@ -106,6 +108,19 @@ def llm_assets_verified() -> bool:
     return _verify_checksum_manifest()[0]
 
 
+def _announce_llm_assets_once() -> None:
+    global _CHECKSUM_ANNOUNCED
+    ok, message, count = _verify_checksum_manifest()
+    if not ok:
+        print(message)
+        return
+    if count == 0:
+        return
+    if not _CHECKSUM_ANNOUNCED:
+        print(f"LLM assets verified ({count} items).")
+        _CHECKSUM_ANNOUNCED = True
+
+
 def _resolve_index_path(index_override: str | None) -> Path:
     if index_override:
         return Path(index_override).expanduser().resolve()
@@ -150,11 +165,18 @@ def _voice_single_turn(args, prompt: str | None = None, *, mode: Mode | None = N
             tts_stub.speak("Index missing.")
             return
 
-        result = rag.answer(
-            utterance,
-            client_slug=getattr(args, "use_client", None),
-            index_path=str(index_path),
-        ) or {}
+        if getattr(args, "llm", False):
+            result = rag.answer_llm(
+                utterance,
+                source_slug=getattr(args, "use_client", None),
+                realtime=getattr(args, "realtime", False),
+            )
+        else:
+            result = rag.answer(
+                utterance,
+                client_slug=getattr(args, "use_client", None),
+                index_path=str(index_path),
+            ) or {}
         answer_text = str(result.get("answer_text") or result.get("summary") or "").strip()
         citations = result.get("sources") or []
 
@@ -211,13 +233,15 @@ def _set_source_and_reindex(
 
     sandbox_result = _print_sandbox_if_hardened(mode, emit=emit)
 
-    return {
+    result = {
         "status": "ok",
         "audit": audit_line,
         "sandbox": sandbox_result,
         "stats": stats,
         "index_path": str(index_path),
     }
+    _announce_llm_assets_once()
+    return result
 
 
 def handle_set_source_from_ui(path: str, *, force: bool = False, mode: Mode = Mode.STANDARD) -> dict:
@@ -430,7 +454,7 @@ def _register_ui_cleanup(proc: subprocess.Popen[str]) -> None:
     atexit.register(_cleanup)
 
 
-def _run_ui_loop(view: str) -> None:
+def _run_ui_loop(view: str, *, use_llm: bool, realtime: bool) -> None:
     if not LLM_ENABLED:
         print(LLM_DISABLED_REASON or "LLM disabled due to checksum failure.")
         print("UI launcher continuing with retriever-only mode.")
@@ -457,6 +481,14 @@ def _run_ui_loop(view: str) -> None:
         webbrowser.open(url)
     except webbrowser.Error as exc:
         print(f"Browser launch failed: {exc}")
+
+    if use_llm:
+        _announce_llm_assets_once()
+        print("UI: SSE streaming enabled for LLM answers.")
+    else:
+        print("UI: Using retriever-only responses.")
+    if realtime:
+        print("UI: Realtime retrieval mode active (slow path).")
 
     print("Press Ctrl+C to stop the web UI server.")
     try:
@@ -510,12 +542,14 @@ def handle_hotswap_from_ui(client_slug: str, *, mode: Mode = Mode.STANDARD) -> d
             decrypted = _decrypt_index_if_needed(entry, mode, emit=False)
         resolved = set_current_source(entry.get("source"))
         sandbox = _print_sandbox_if_hardened(mode, emit=False)
-        return {
+        result = {
             "status": "ok",
             "source": str(resolved),
             "sandbox": sandbox,
             "decrypted_index": str(decrypted) if decrypted else None,
         }
+        _announce_llm_assets_once()
+        return result
     except Exception as exc:
         return {"status": "error", "audit": str(exc)}
     finally:
@@ -579,7 +613,22 @@ def boot(args):
             print(LLM_DISABLED_REASON or "LLM disabled due to checksum failure.")
     elif args.ask:
         if LLM_ENABLED:
-            retriever.run(args.ask, index_path=args.index, use_client=args.use_client)
+            if args.llm:
+                result = rag.answer_llm(
+                    args.ask,
+                    source_slug=args.use_client,
+                    realtime=args.realtime,
+                )
+                print(result.get("answer") or result.get("answer_text") or "")
+                if result.get("plan"):
+                    print()
+                    print(f"Plan: {result['plan']}")
+                sources = result.get("sources") or []
+                if sources:
+                    print()
+                    retriever._print_sources(sources)
+            else:
+                retriever.run(args.ask, index_path=args.index, use_client=args.use_client)
         else:
             print(LLM_DISABLED_REASON or "LLM disabled due to checksum failure." )
     elif args.voice:
@@ -631,6 +680,16 @@ def main() -> None:
         choices=["standard", "enhanced"],
         default=None,
         help="Launch loopback web UI in the chosen mode",
+    )
+    ap.add_argument(
+        "--llm",
+        action="store_true",
+        help="Use the LLM generator instead of retriever summaries",
+    )
+    ap.add_argument(
+        "--realtime",
+        action="store_true",
+        help="Force realtime retrieval (slow path)",
     )
     ap.add_argument(
         "--ingest",
@@ -788,7 +847,9 @@ def main() -> None:
                 return
         resolved = set_current_source(entry.get("source"))
         print(f"Hotswap completed: {args.hotswap} → {resolved}")
-        _print_sandbox_if_hardened(selected_mode)
+        sandbox_info = _print_sandbox_if_hardened(selected_mode)
+        if sandbox_info:
+            _announce_llm_assets_once()
         _purge_decrypted_index(Path(decrypted) if decrypted else None)
         return
 

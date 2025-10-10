@@ -1,361 +1,236 @@
 # apps/webui/server_stdlib.py
-from __future__ import annotations
-import argparse, json, traceback, os
+import json, time, uuid
 from pathlib import Path
-from http import HTTPStatus
+from typing import Optional, Dict, List, Tuple, Iterable
 from wsgiref.simple_server import make_server
 from urllib.parse import parse_qs
 
-# deps from our codebase
-from services.threads import store, export as thread_export
-from services.retriever import serve as retriever
-from services.indexer.source import get_current_source, index_path_for_source
-from apps.webui import pdf_engine
+from services.security.http_guard import apply_secure_headers
+from services.threads import store
+from services.retriever import serve as rag
+from services.threads.export import render_thread_html
 
-try:
-    from services.ingest import registry as ingest_registry
-except Exception:  # pragma: no cover - optional dependency
-    ingest_registry = None
+ROOT = Path(__file__).parent.resolve()
+STATIC = ROOT / "static"
+TEMPL = ROOT / "templates"
 
-# --- Security headers (WSGI friendly) ---
-_CSP = (
-  "default-src 'none'; "
-  "script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; font-src 'self'; "
-  "object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
-)
-_SEC_HEADERS = [
-  ("Content-Security-Policy", _CSP),
-  ("X-Content-Type-Options", "nosniff"),
-  ("X-Frame-Options", "DENY"),
-  ("Referrer-Policy", "no-referrer"),
-  ("Permissions-Policy", "geolocation=(), microphone=(), camera=()"),
-]
+# Simple in-memory SSE registry
+_streams: Dict[str, Dict] = {}  # sid -> {"q": List[str], "done": bool, "err": Optional[str], "meta": dict}
 
-BASE_DIR = Path(__file__).resolve().parent
-TEMPLATES_DIR = (BASE_DIR / "templates").resolve()
-STATIC_DIR = (BASE_DIR / "static").resolve()
+def _hdr(content_type: str, extra: Optional[List[Tuple[str, str]]] = None) -> List[Tuple[str, str]]:
+    merged = [("Content-Type", content_type)] + (extra or [])
+    secured, _audit = apply_secure_headers(merged)
+    if isinstance(secured, dict):
+        return [(str(k), str(v)) for k, v in secured.items()]
+    return [(str(k), str(v)) for k, v in secured]  # type: ignore[arg-type]
 
-_MIME = {
-    ".html": "text/html; charset=utf-8",
-    ".js": "text/javascript; charset=utf-8",
-    ".css": "text/css; charset=utf-8",
-    ".svg": "image/svg+xml",
-}
-
-def _with_sec(headers: list[tuple[str,str]] | None) -> list[tuple[str,str]]:
-    base: list[tuple[str,str]] = []
-    if headers:
-        for k, v in headers:
-            base.append((str(k), str(v)))
-    base.extend(_SEC_HEADERS)
-    return base
-
-def _serve_file(path: Path):
-    ext = path.suffix.lower()
-    ct = _MIME.get(ext, "application/octet-stream")
-    body = path.read_bytes()
-    headers = [("Content-Type", ct), ("Cache-Control", "no-store")]
-    return "200 OK", _with_sec(headers), body
-
-def _read_registry() -> dict[str, object]:
-    if ingest_registry and hasattr(ingest_registry, "load_registry"):
-        try:
-            data = ingest_registry.load_registry()
-            if isinstance(data, dict):
-                return data
-        except Exception:
-            pass
-    registry_path = Path("Data/ingested_registry.json")
-    if registry_path.exists():
-        try:
-            data = json.loads(registry_path.read_text(encoding="utf-8") or "{}")
-            if isinstance(data, dict):
-                return data
-        except Exception:
-            return {}
-    return {}
-
-def _read_json(environ) -> dict[str, object] | None:
-    try:
-        length = int(environ.get("CONTENT_LENGTH", "0") or 0)
-    except Exception:
-        length = 0
-    if length < 0:
-        length = 0
-    body = environ["wsgi.input"].read(length) if length else b""
-    if not body:
-        return {}
-    try:
-        return json.loads(body.decode("utf-8"))
-    except json.JSONDecodeError:
-        return None
-
-
-def _json_response(
-    payload: dict[str, object],
-    *,
-    status_code: int = 200,
-    extra_headers: list[tuple[str, str]] | None = None,
-):
-    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    headers: list[tuple[str, str]] = [
-        ("Content-Type", "application/json; charset=utf-8"),
-        ("Cache-Control", "no-store"),
-        ("Content-Length", str(len(body))),
-    ]
-    if extra_headers:
-        headers.extend(extra_headers)
-    status_line = f"{status_code} {HTTPStatus(status_code).phrase}"
-    return status_line, _with_sec(headers), body
-
-
-def _ok_json(payload: dict[str, object], extra_headers: list[tuple[str, str]] | None = None):
-    return _json_response(payload, status_code=200, extra_headers=extra_headers)
-
-
-def _error_json(code: int, message: str):
-    return _json_response({"error": message}, status_code=code)
-
-
-def _ok_html(html: str, extra_headers: list[tuple[str, str]] | None = None):
-    body = html.encode("utf-8")
-    headers = [
-        ("Content-Type", "text/html; charset=utf-8"),
-        ("Cache-Control", "no-store"),
-    ]
-    if extra_headers:
-        headers.extend(extra_headers)
-    return "200 OK", _with_sec(headers), body
-
-
-def _no_content():
-    return "204 No Content", _with_sec([( "Cache-Control", "no-store")]), b""
-
-
-def _respond_json(
-    start_response,
-    status_code: int,
-    payload: dict[str, object],
-    extra_headers: list[tuple[str, str]] | None = None,
-):
-    status, headers, body = _json_response(payload, status_code=status_code, extra_headers=extra_headers)
+def _json(start_response, obj, status: str = "200 OK"):
+    body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
+    headers = _hdr("application/json", [("Content-Length", str(len(body)))])
     start_response(status, headers)
     return [body]
 
+def _ok(start_response, body: bytes, ctype="text/plain", status="200 OK"):
+    start_response(status, _hdr(ctype))
+    return [body]
 
-def app(environ, start_response):
-    method = environ["REQUEST_METHOD"]
-    path = (environ.get("PATH_INFO") or "/").rstrip("/") or "/"
-    qs = parse_qs(environ.get("QUERY_STRING", ""))
+def _notfound(start_response):
+    start_response("404 Not Found", _hdr("text/plain"))
+    return [b""]
 
+def _error(start_response, msg: str):
     try:
-        # health & favicon
-        if method=="GET" and path=="/health":
-            status, headers, body = _ok_json({"ok": True})
-            start_response(status, headers); return [body]
-        if method=="GET" and path=="/favicon.ico":
-            status, headers, body = _no_content()
-            start_response(status, headers); return [body]
+        start_response("500 Internal Server Error", _hdr("text/plain"))
+    except AssertionError:
+        return []
+    return [msg.encode("utf-8")]
 
-        # home html shell
-        if method=="GET" and path=="/":
-            html_path = TEMPLATES_DIR / "threads.html"
-            if not html_path.exists():
-                start_response("500 Internal Server Error", _with_sec([("Content-Type","text/plain")]))
-                return [b"Missing threads template"]
-            status, headers, body = _serve_file(html_path)
-            start_response(status, headers); return [body]
-
-        # static assets
-        if method=="GET" and path.startswith("/static/"):
-            rel = path.split("/static/", 1)[1]
-            target = (STATIC_DIR / rel).resolve()
-            try:
-                if not str(target).startswith(str(STATIC_DIR)) or not target.exists() or not target.is_file():
-                    raise FileNotFoundError
-                status, headers, body = _serve_file(target)
-                start_response(status, headers); return [body]
-            except FileNotFoundError:
-                start_response("404 Not Found", _with_sec([( "Content-Type","text/plain")]))
-                return [b""]
-
-        # API: list/search threads
-        if method=="GET" and path in ("/api/threads", "/threads"):
-            q_raw = (qs.get("q", [""])[0] or "")
-            results = store.search(q_raw, limit=0)
-            threads = []
-            for entry in results:
-                thread = store.get_thread(entry.get("id")) if isinstance(entry, dict) else None
-                threads.append(thread or entry)
-            status, headers, body = _ok_json({"threads": threads})
-            start_response(status, headers); return [body]
-
-        # source info
-        if method=="GET" and path in ("/api/sources", "/sources"):
-            current = get_current_source()
-            index_path = str(index_path_for_source(current)) if current else None
-            registry = _read_registry()
-            clients = sorted(registry.keys()) if isinstance(registry, dict) else []
-            payload = {
-                "active_source": str(current) if current else None,
-                "managed_index": index_path,
-                "clients": clients,
-            }
-            status, headers, body = _ok_json(payload)
-            start_response(status, headers); return [body]
-
-        # new thread
-        if method=="POST" and path=="/threads":
-            data = _read_json(environ)
-            if data is None:
-                status, headers, body = _error_json(400, "invalid json")
-                start_response(status, headers); return [body]
-            t = store.new_thread(
-                data.get("title","Untitled"),
-                data.get("client_slug"),
-                data.get("source_slug"),
-            )
-            status, headers, body = _ok_json({"thread": t})
-            start_response(status, headers); return [body]
-
-        # append message + answer
-        if method=="POST" and path.startswith("/threads/") and path.endswith("/messages"):
-            parts = path.strip("/").split("/")
-            if len(parts) != 3:
-                return _respond_json(start_response, 404, {"error": "not found"})
-
-            tid = parts[1]
-            payload = _read_json(environ)
-            if payload is None:
-                return _respond_json(start_response, 400, {"error": "invalid json"})
-
-            text = (payload.get("text") or payload.get("prompt") or "").strip()
-            if not text:
-                return _respond_json(start_response, 400, {"error": "empty prompt"})
-
-            thread = store.get_thread(tid)
-            if not thread:
-                return _respond_json(start_response, 404, {"error": "thread not found"})
-
-            user_msg = store.append_message(tid, "user", text, [])
-            if user_msg is None:
-                return _respond_json(start_response, 500, {"error": "failed to append message"})
-
-            client_slug = thread.get("client_slug") if isinstance(thread, dict) else None
-            source_path = thread.get("source_path") if isinstance(thread, dict) else None
-
-            result = retriever.answer(
-                text,
-                client_slug=str(client_slug) if client_slug else None,
-                source_path=str(source_path) if source_path else None,
-            )
-            answer_text = result.get("answer_text") or result.get("answer") or "Here's what I found."
-            plan = (result.get("plan") or "Plan: review archives and ingest missing documents before answering.").strip()
-            bullets = [b for b in (result.get("bullets") or []) if b]
-            citations = result.get("sources") or []
-
-            assistant_msg = store.append_message(
-                tid,
-                "assistant",
-                answer_text,
-                citations=citations,
-                meta={"plan": plan},
-            )
-            if assistant_msg is None:
-                return _respond_json(start_response, 500, {"error": "failed to append assistant message"})
-
-            updated = store.get_thread(tid)
-            return _respond_json(
-                start_response,
-                200,
-                {
-                    "thread": updated,
-                    "reply": {
-                        "text": answer_text,
-                        "plan": plan,
-                        "bullets": bullets,
-                    },
-                    "sources": citations,
-                },
-            )
-
-        # archive
-        if method=="POST" and path.startswith("/threads/") and path.endswith("/archive"):
-            tid = path.split("/")[2]
-            store.archive(tid)
-            status, headers, body = _ok_json({"ok": True})
-            start_response(status, headers); return [body]
-
-        # search (optional q)
-        if method=="GET" and path in ("/api/search", "/search"):
-            q_raw = (qs.get("q", [""])[0] or "")
-            results = store.search(q_raw)
-            status, headers, body = _ok_json({"matches": results})
-            start_response(status, headers); return [body]
-
-        # placeholders for future UI → CLI bridges
-        if method=="POST" and path in ("/set-source","/ingest","/hotswap","/preset","/sources"):
-            status, headers, body = _ok_json({"queued": True})
-            start_response(status, headers); return [body]
-
-        # print (large-print)
-        if method=="GET" and path.startswith("/_print/"):
-            tid  = path.rsplit("/",1)[1]
-            html = thread_export.render_thread_html(tid, {"font":"large"})
-            status, headers, body = _ok_html(html, [("X-Action-Audit","Print invoked (local assets only)")])
-            start_response(status, headers); return [body]
-
-        # export pdf (auto-select engine)
-        if method=="GET" and path.startswith("/export/pdf/"):
-            tid  = path.rsplit("/",1)[1]
-            html = thread_export.render_thread_html(tid, {"font":"standard"})
-            pdf_bytes, audit_hdr, audit_detail = pdf_engine.render_pdf_bytes(html)
-            if pdf_bytes:
-                headers = [
-                    ("Content-Type","application/pdf"),
-                    ("Content-Disposition", f'attachment; filename="thread-{tid}.pdf"'),
-                    ("X-Action-Audit", audit_hdr),
-                    ("X-Engine-Detail", audit_detail),
-                ]
-                start_response("200 OK", _with_sec(headers))
-                return [pdf_bytes]
-            return _respond_json(
-                start_response,
-                200,
-                {"fallback": "print-to-pdf", "thread_id": tid},
-                extra_headers=[
-                    ("X-Action-Audit", audit_hdr),
-                    ("X-Engine-Detail", audit_detail),
-                ],
-            )
-
-        # 404
-        start_response("404 Not Found", _with_sec([( "Content-Type","text/plain")]))
-        return [b""]
-
+def _read_json(env) -> dict:
+    try:
+        n = int(env.get("CONTENT_LENGTH") or 0)
+        raw = (env["wsgi.input"].read(n) if n else b"").decode("utf-8")
+        return json.loads(raw) if raw else {}
     except Exception:
-        tb = traceback.format_exc().encode("utf-8")
-        start_response("500 Internal Server Error", _with_sec([( "Content-Type","text/plain")]))
-        return [tb]
+        return {}
 
-def main():
+def _serve_file(start_response, path: Path, ctype="text/plain"):
+    if not path.exists() or not path.is_file():
+        return _notfound(start_response)
+    return _ok(start_response, path.read_bytes(), ctype)
+
+def _stream_iter(sid: str) -> Iterable[bytes]:
+    """SSE generator. Sends raw tokens via `data: <tok>` lines,
+    then one `event: meta` with sources, then `event: end`."""
+    idx = 0
+    while True:
+        buf = _streams.get(sid)
+        if not buf:
+            yield b"event: error\ndata: stream-missing\n\n"
+            break
+
+        q = buf["q"]
+        # flush new tokens
+        while idx < len(q):
+            tok = q[idx]
+            idx += 1
+            yield f"data: {tok}\n\n".encode("utf-8")
+
+        if buf.get("err"):
+            yield f"event: error\ndata: {buf['err']}\n\n".encode("utf-8")
+            break
+
+        if buf.get("done"):
+            meta = buf.get("meta") or {}
+            yield f"event: meta\ndata: {json.dumps(meta)}\n\n".encode("utf-8")
+            yield b"event: end\ndata: end\n\n"
+            break
+
+        time.sleep(0.02)
+
+def _launch_answer_thread(sid: str, prompt: str, realtime: bool, client_slug: Optional[str], source_path: Optional[str]):
+    """Bridge `answer_llm` into our SSE queue. We use a callback for streaming tokens,
+    collect them locally to persist as the assistant message at the end."""
+    import threading
+    def _runner():
+        tokens: List[str] = []
+        try:
+            # Stream callback pushes into SSE queue and local buffer
+            def on_token(tok: str):
+                tokens.append(tok)
+                _streams[sid]["q"].append(tok)
+
+            # Contract: answer_llm supports stream_callback=, returns final dict with sources
+            final = rag.answer_llm(
+                prompt,
+                source_slug=source_path,
+                realtime=realtime,
+                stream_callback=on_token
+            ) or {}
+
+            _streams[sid]["meta"] = {"sources": final.get("sources", [])}
+            _streams[sid]["done"] = True
+
+            # Persist assistant message with full text (best-effort)
+            full = "".join(tokens).strip()
+            if full:
+                # Optional: attach sources in message meta if store supports it
+                try:
+                    store.append_message(final.get("thread_id") or "", role="assistant", content=full)
+                except Exception:
+                    pass
+        except Exception as e:
+            _streams[sid]["err"] = str(e)
+    threading.Thread(target=_runner, daemon=True).start()
+
+def _brand_info() -> dict:
+    try:
+        p = Path("Data/settings/branding.json")
+        if p.exists():
+            return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return {"productName": "Arteem", "owner": "Eric Martin", "org": "OCRC"}
+
+def app(env, start_response):
+    try:
+        method = env.get("REQUEST_METHOD", "GET").upper()
+        path = env.get("PATH_INFO") or "/"
+
+        # Root page + static
+        if path == "/":
+            return _serve_file(start_response, TEMPL / "threads.html", "text/html")
+        if path.startswith("/static/"):
+            p = (STATIC / path[len("/static/"):]).resolve()
+            if str(p).endswith(".css"): return _serve_file(start_response, p, "text/css")
+            if str(p).endswith(".js"):  return _serve_file(start_response, p, "application/javascript")
+            return _serve_file(start_response, p)
+
+        # Branding + source banner
+        if path == "/api/brand" and method == "GET":
+            return _json(start_response, _brand_info())
+        if path == "/api/sources" and method == "GET":
+            from services.indexer.source import get_current_source
+            src = get_current_source()
+            return _json(start_response, {"current_source": str(src) if src else ""})
+
+        # Threads JSON index
+        if path == "/api/threads" and method == "GET":
+            return _json(start_response, {"threads": store.list_threads()})
+
+        # Create thread
+        if path == "/threads" and method == "POST":
+            data = _read_json(env)
+            client_slug = data.get("client_slug") or "default"
+            source_slug = data.get("source_slug") or client_slug
+            thread = store.create_thread(
+                title=(data.get("title") or "Untitled"),
+                client_slug=client_slug,
+                source_slug=source_slug,
+                source_path=(data.get("source_path") or "")
+            )
+            return _json(start_response, {"thread": thread}, "201 Created")
+
+        # Append user message
+        if path.startswith("/threads/") and path.endswith("/messages") and method == "POST":
+            tid = path.split("/")[2]
+            data = _read_json(env)
+            mid = store.append_message(tid, role="user", content=(data.get("content") or ""))
+            return _json(start_response, {"ok": True, "message_id": mid})
+
+        if path.startswith("/threads/") and path.endswith("/archive") and method == "POST":
+            tid = path.split("/")[2]
+            data = _read_json(env)
+            archive_flag = data.get("archive") if isinstance(data, dict) else None
+            should_archive = True if archive_flag is None else bool(archive_flag)
+            store.archive_thread(tid, archive=should_archive)
+            return _json(start_response, {"ok": True, "archived": should_archive})
+
+        # Ask → start stream
+        if path == "/api/ask" and method == "POST":
+            data = _read_json(env)
+            prompt = data.get("prompt") or ""
+            realtime = bool(data.get("realtime"))
+            client_slug = data.get("client_slug")  # reserved for future scoping
+            source_path = data.get("source_path")
+            sid = uuid.uuid4().hex
+            _streams[sid] = {"q": [], "done": False, "err": None, "meta": {}}
+            _launch_answer_thread(sid, prompt, realtime, client_slug, source_path)
+            return _json(start_response, {"sid": sid, "sse": f"/stream?sid={sid}"})
+
+        # SSE endpoint
+        if path == "/stream" and method == "GET":
+            qs = parse_qs(env.get("QUERY_STRING") or "")
+            sid = (qs.get("sid", [""])[0])
+            # Important: correct header shape; also disable proxy buffering
+            headers = _hdr("text/event-stream", [
+                ("Cache-Control", "no-cache"),
+                ("X-Accel-Buffering", "no"),
+            ])
+            start_response("200 OK", headers)
+            return _stream_iter(sid)
+
+        # Print large text
+        if path.startswith("/_print/") and method == "GET":
+            tid = path.split("/")[-1]
+            html = render_thread_html(tid, {"font": "large"})
+            return _ok(start_response, html.encode("utf-8"), "text/html")
+
+        # PDF fallback (no engine bundled yet)
+        if path.startswith("/export/pdf/") and method == "GET":
+            return _json(start_response, {"fallback": "print-to-pdf"})
+
+        return _notfound(start_response)
+
+    except Exception as e:
+        # Make the failure visible but still return valid headers
+        return _error(start_response, f"Traceback: {e}")
+
+if __name__ == "__main__":
+    import argparse
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=0)
     ap.add_argument("--view", choices=["standard","enhanced"], default="standard")
-    ap.add_argument("--ready-file", default=None)
     args = ap.parse_args()
-
-    srv = make_server("127.0.0.1", args.port, app)
-    url = f"http://127.0.0.1:{srv.server_port}"
-    print("CSP applied (offline assets only).", flush=True)
-    print(f"UI: {url} (view={args.view})", flush=True)
-
-    if args.ready_file:
-        os.makedirs(os.path.dirname(args.ready_file), exist_ok=True)
-        with open(args.ready_file, "w", encoding="utf-8") as f:
-            f.write(url)
-
-    srv.serve_forever()
-
-if __name__=="__main__":
-    main()
+    httpd = make_server("127.0.0.1", args.port or 0, app)
+    print(f"UI: http://127.0.0.1:{httpd.server_port} (view={args.view})", flush=True)
+    httpd.serve_forever()

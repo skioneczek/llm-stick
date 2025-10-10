@@ -1,7 +1,7 @@
 """HTTP response hardening helpers for the offline UI."""
 from __future__ import annotations
 
-from typing import Mapping
+from typing import Iterable, Mapping, Tuple
 
 CSP_HEADER = (
     "default-src 'none';"
@@ -25,8 +25,13 @@ SECURE_HEADERS = {
 AUDIT_CSP_APPLIED = "CSP applied (offline assets only)."
 
 
-def apply_secure_headers(response: Mapping[str, str] | dict) -> tuple[Mapping[str, str], str]:
+def apply_secure_headers(
+    response: Mapping[str, str] | dict | Iterable[Tuple[str, str]]
+) -> tuple[Mapping[str, str], str]:
     """Return headers with secure defaults applied and an audit string."""
-    headers = dict(response)
+    if isinstance(response, Mapping):
+        headers = {str(k): str(v) for k, v in response.items()}
+    else:
+        headers = {str(k): str(v) for k, v in response}
     headers.update(SECURE_HEADERS)
     return headers, AUDIT_CSP_APPLIED
